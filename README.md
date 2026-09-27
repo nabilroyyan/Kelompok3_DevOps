@@ -54,7 +54,7 @@ Repositori ini digunakan sebagai wadah kolaborasi seluruh anggota kelompok dalam
 | Cloud/Server | VPS / Cloud Provider |
 
 ---
-
+git
 ## 📁 Struktur Repositori (Rencana)
 
 ```
@@ -90,6 +90,34 @@ To be announced
 Proyek ini dilisensikan sesuai berkas [LICENSE](LICENSE).
 
 ---
+
+
+## Panduan Setup Database & Koneksi Laravel
+
+1. **Import Database**
+   - Buat database MySQL baru dengan nama `classicmodels`.
+   - masuk ke folder axon-dss `cd axon-dss`.
+   - jalankan perintah `mysql -u root -p classicmodels < "Axon sales - Mysql Database.sql"`' untuk import ke database(pastikan file Axon sales - Mysql Database.sql ada di dalam file laravel axon-dss).
+
+2. **Konfigurasi Environment**
+   - Duplikasi file `.env.example` menjadi `.env` (jika cloning dari repo):
+     jalan perintah ` cp .env.example .env`
+   - Jalankan `php artisan key:generate`.
+   - Sesuaikan konfigurasi database pada file `.env`:
+     ```env
+     DB_CONNECTION=mysql
+     DB_HOST=127.0.0.1
+     DB_PORT=3306
+     DB_DATABASE=classicmodels
+     DB_USERNAME=root
+     DB_PASSWORD=
+     ```
+     
+
+3. **Verifikasi Koneksi**
+   - Jalankan perintah `php artisan config:clear` untuk memperbarui konfigurasi.
+
+
 
 <div align="center">
 
