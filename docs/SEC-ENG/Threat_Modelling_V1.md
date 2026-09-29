@@ -3,7 +3,7 @@
 ## SISTEM PENDUKUNG KEPUTUSAN (DSS) PENJUALAN AXON
 
 **Mata Kuliah:** Workshop DevSecOps — Evaluasi Tengah Semester (UTS)<br>
-**Metodologi:** STRIDE
+**Metodologi:** STRIDE<br>
 **Referensi Acuan:** `docs/PO/1. Project-Overview.md`, `docs/PO/1.2 Risk.md`, `Role.md`, `bab-01.md`, Issue #4 (Milestone 1), `Axon_sales_-_Mysql_Database.sql` (skema `classicmodels`)
 
 > **Catatan Cakupan:** Dokumen ini disusun pada tahap perencanaan (Milestone 1), sebelum implementasi kode dimulai. Analisis difokuskan pada arsitektur dan alur data tingkat tinggi sesuai batasan yang ditetapkan PO. Detail teknis spesifik terkait stack backend/frontend yang dipilih Developer akan didokumentasikan dan dievaluasi ulang pada **Threat Modeling v2** setelah implementasi berjalan.
