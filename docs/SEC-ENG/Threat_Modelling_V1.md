@@ -14,7 +14,7 @@
 
 Threat modeling v1 ini mencakup arsitektur **Dashboard DSS Axon** sebagaimana didefinisikan oleh Product Owner di `Project-Overview.md`:
 
-- Aplikasi web dashboard **read-only/analytical** — hanya menampilkan agregasi data dan visualisasi grafik, tanpa fungsi transaksi apa pun.
+- Aplikasi web dashboard **read-only/analytical**, hanya menampilkan agregasi data dan visualisasi grafik, tanpa fungsi transaksi apa pun.
 - Ter-kontainerisasi penuh (Docker & Docker Compose).
 - Backend berupa **REST API service** yang membaca data dari basis data **PostgreSQL** (skema `classicmodels`, di-porting dari dataset `Axon sales`).
 - Frontend berupa **Web UI interaktif** yang menampilkan 4 modul keputusan bisnis (Revenue Overview, Order Fulfillment, Inventory Health, Customer Intelligence).
@@ -71,7 +71,7 @@ flowchart LR
 
 |  #   | Kategori STRIDE            | Komponen Terdampak          | Skenario Ancaman                                                                                                                                           | Aset Terkait     | Tingkat Risiko |
 | :--: | :------------------------- | :-------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------------- | :-----------------: |
-| T-01 | **S**poofing               | Web UI / API Backend        | Karena dashboard tidak memiliki sistem akun (sesuai cakupan PO), tidak ada identitas pengguna yang bisa diverifikasi atau dipalsukan — kategori ini secara arsitektural tidak relevan untuk sistem read-only tanpa login | — | N/A |
+| T-01 | **S**poofing               | Web UI / API Backend        | Karena dashboard tidak memiliki sistem akun (sesuai cakupan PO), tidak ada identitas pengguna yang bisa diverifikasi atau dipalsukan
 | T-02 | **T**ampering              | Query API → Database        | Manipulasi parameter filter (Tahun/Bulan/Kategori) pada request untuk melakukan **SQL Injection**, mengubah/membaca data di luar cakupan yang diizinkan | A-01, A-02, A-03 |     **Kritis**      |
 | T-03 | **T**ampering              | Data in transit (WEB ↔ API) | Modifikasi data agregasi saat transit apabila komunikasi tidak dienkripsi (tanpa TLS)                                                                      | A-05             |       Tinggi        |
 | T-04 | **R**epudiation            | API Backend                 | Tidak adanya log akses membuat tim kesulitan menelusuri sumber trafik mencurigakan atau pola akses abnormal ke data sensitif                                | A-02, A-03       |       Sedang        |
