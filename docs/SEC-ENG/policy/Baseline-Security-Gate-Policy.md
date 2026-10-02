@@ -162,11 +162,11 @@ policy/
 
 ## 11. Checklist Acceptance Issue #5
 
-- [x] Threshold SCA & Container (Trivy: FAIL jika ada Critical): `trivy.yaml`
-- [x] Aturan Secret Scanning (Gitleaks/TruffleHog): `gitleaks.toml`
-- [x] Konfigurasi awal kebijakan di folder `/policy`
-- [x] SonarQube Quality Gate & konfigurasi SAST: `sonarqube/`
-- [x] Pemetaan ke ancaman TM v1 (bagian 6)
-- [x] Tugas Security: TLS baseline, Exposure Control, Logging minimum (`baseline/`)
-- [x] Alur Pre-Risk → Evidence → Residual Risk (`risk/risk-register.md`, `verify-deployment.sh`)
+- [ ] Threshold SCA & Container (Trivy: FAIL jika ada Critical): `trivy.yaml`
+- [ ] Aturan Secret Scanning (Gitleaks/TruffleHog): `gitleaks.toml`
+- [ ] Konfigurasi awal kebijakan di folder `/policy`
+- [ ] SonarQube Quality Gate & konfigurasi SAST: `sonarqube/`
+- [ ] Pemetaan ke ancaman TM v1 (bagian 6)
+- [ ] Tugas Security: TLS baseline, Exposure Control, Logging minimum (`baseline/`)
+- [ ] Alur Pre-Risk → Evidence → Residual Risk (`risk/risk-register.md`, `verify-deployment.sh`)
 - [ ] Evidence dan Residual Risk final: diisi setelah Developer dan Platform selesai menerapkan (belum bisa dibuktikan pada tahap perencanaan)
