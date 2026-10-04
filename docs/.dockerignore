@@ -1,0 +1,37 @@
+# ============================================================================
+# Build context untuk Dockerfile di docs/Infra/docker/*
+#
+# docker-compose.yml berada di docs/Infra/, sehingga build context diarahkan ke
+# folder induknya (`docs/`). Berkas ini harus berada tepat di root context.
+#
+# Tujuan: agar konteks build tidak membawa vendor/, node_modules/, sertifikat,
+# dan dokumen yang tidak dibutuhkan image (memperkecil context + menghindari
+# kebocoran berkas ke layer image).
+# ============================================================================
+
+**/.DS_Store
+**/.git
+**/.gitignore
+
+# Rahasia & sertifikat
+Infra/.env
+Infra/.env.*
+Infra/certs
+Infra/evidence
+Infra/logs
+
+# Dokumen yang tidak dipakai image
+PO
+SEC-ENG
+
+# Dependensi & artefak build (dipasang ulang di dalam image)
+Dev/axon-devsecops-dss/app/backend/vendor
+Dev/axon-devsecops-dss/app/backend/node_modules
+Dev/axon-devsecops-dss/app/backend/.env
+Dev/axon-devsecops-dss/app/frontend/node_modules
+Dev/axon-devsecops-dss/app/frontend/dist
+
+# Berkas kerja Developer yang tidak diperlukan runtime
+Dev/axon-devsecops-dss/app/backend/AGENTS.md
+Dev/axon-devsecops-dss/app/backend/CLAUDE.md
+Dev/axon-devsecops-dss/app/backend/fixed-postgres.sql
