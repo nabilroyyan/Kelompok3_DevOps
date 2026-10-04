@@ -111,8 +111,10 @@ Proyek ini dilisensikan sesuai berkas [LICENSE](LICENSE).
      DB_DATABASE=classicmodels
      DB_USERNAME=root
      DB_PASSWORD=
+
+     SESSION_DRIVER=file
      ```
-     
+
 
 3. **Verifikasi Koneksi**
    - Jalankan perintah `php artisan config:clear` untuk memperbarui konfigurasi.
