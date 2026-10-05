@@ -95,6 +95,81 @@ Kelompok3_DevOps/
 
 
 
+## 🛡️ Status Implementasi DevSecOps
+
+Evaluasi kesiapan sistem terhadap integrasi praktik **DevSecOps**, keamanan kode, dan arsitektur kontainer berdasarkan tanggung jawab 4 peran:
+
+### 1. Ringkasan Status Proyek (Scorecard)
+- **Fase Saat Ini:** Transisi dari **Milestone 2 (Secure Development)** menuju **Milestone 3 (Containerization & Security Scanning)**.
+- **Tingkat Kesiapan (Readiness):** **~75%** (Aplikasi, kebijakan keamanan, dan konfigurasi Docker sudah siap; integrasi pipeline otomatis dan pengujian live scan sedang berjalan).
+
+| Domain DevSecOps | Status | Keterangan |
+| :--- | :---: | :--- |
+| **Secure Coding & Anti-SQLi** | 🟢 **Selesai** | Parameterized query (Laravel Query Builder), 100% read-only API. |
+| **Secrets Management** | 🟢 **Selesai** | `.env` terisolasi dari Git, konfigurasi `gitleaks.toml` tersedia. |
+| **Threat Modeling (v1)** | 🟢 **Selesai** | Analisis STRIDE & PASTA terdokumentasi di `docs/SEC-ENG/Threat-Modelling-V1.md`. |
+| **Security Policy as Code** | 🟢 **Selesai** | Aturan Trivy, Gitleaks, dan SonarQube Quality Gate siap pakai. |
+| **Container Hardening Specs** | 🟢 **Selesai** | Dockerfile PHP-FPM & Nginx proxy (non-root) dan `docker-compose.yml` siap di `docs/INFRA`. |
+| **Software Bill of Materials (SBOM)**| 🔴 **Belum** | Artefak CycloneDX / SPDX di folder `/sbom` belum di-generate. |
+| **Automated CI/CD Pipeline** | 🟡 **Parsial** | Aturan `security-gate.yml` sudah dibuat, tetapi belum dipasang ke `.github/workflows/`. |
+| **Audit Scan Reports (`/reports`)** | 🟡 **Parsial** | Folder `/reports` belum berisi output bukti scan aktual (SARIF / JSON). |
+
+---
+
+### 2. Apa yang SUDAH Diimplementasikan (Accomplished)
+
+#### A. Product Owner (PO)
+- [x] Menyusun dokumen visi, tata kelola, dan batasan ketat DSS di [1. Project-Overview.md](docs/PO/1.%20Project-Overview.md).
+- [x] Menyusun matriks toleransi risiko dan kriteria *Security Gate* di [1.2 Risk.md](docs/PO/1.2%20Risk.md).
+- [x] Menyusun pembagian tugas dan rincian peran tim di [1.3. Task-Role.md](docs/PO/1.3.%20Task-Role.md).
+- [x] Menyusun target jadwal sprint kerja di [1.4. Milestone.md](docs/PO/1.4.%20Milestone.md).
+- [x] Melakukan validasi dan audit hasil implementasi teknis developer di [2.1 Developer Analysis Result.md](docs/PO/2.1%20Developer%20Analysis%20Result.md).
+- [x] Menyelaraskan spesifikasi arsitektur 3-tier berbasis database MySQL di [1.1. Architecture.md](docs/PO/1.1.%20Architecture.md).
+
+#### B. Developer (DEV)
+- [x] Mengembangkan antarmuka Dashboard DSS berbasis **React 19 + Vite 8** dengan visualisasi grafik interaktif (Recharts & Chart.js).
+- [x] Membangun **RESTful API Laravel 13 + PHP 8.4** dengan 12 endpoint analitik.
+- [x] Menghubungkan sistem ke basis data relasional **MySQL `classicmodels`** (8 tabel).
+- [x] **Penerapan Secure Coding (Zero SQLi):** Seluruh kueri menggunakan Fluent Query Builder dengan *Prepared Statements* (PDO Parameter Binding).
+- [x] **Pengurangan Bidang Serangan (Attack Surface Reduction):** Seluruh route API hanya melayani metode `GET` (*read-only*), tanpa transaksi atau CRUD terbuka.
+- [x] **Audit Dependensi Bersih:** Dependensi frontend (`npm audit`) mencatatkan **0 vulnerabilities**.
+- [x] Menyediakan skrip launcher pengujian lokal (`run-all.bat`, `run-backend.bat`, `run-frontend.bat`).
+
+#### C. Security Engineer (SEC-ENG)
+- [x] Menyusun dokumen **Threat Modeling v1** ([docs/SEC-ENG/Threat-Modelling-V1.md](docs/SEC-ENG/Threat-Modelling-V1.md)) menggunakan framework STRIDE dan PASTA.
+- [x] Menetapkan aturan pemindaian kebocoran rahasia (*Secret Scanning*) via `policy/gitleaks.toml`.
+- [x] Menetapkan aturan pemindaian kerentanan kontainer & dependensi via `policy/trivy.yaml` dan `.trivyignore`.
+- [x] Menetapkan aturan kualitas kode (*SAST*) via `policy/sonarqube/sonar-project.properties` dan `setup-quality-gate.sh`.
+- [x] Menyusun spesifikasi kebijakan baseline: TLS baseline, kontrol eksposur, audit logging minimum, dan register risiko.
+- [x] Merancang skrip pengujian kepatuhan infrastruktur (`policy/scripts/check-infra-policy.sh`).
+
+#### D. Infrastructure Engineer (INFRA)
+- [x] Menyusun orkestrasi multi-kontainer melalui [docs/INFRA/docker-compose.yml](docs/INFRA/docker-compose.yml).
+- [x] Mengonfigurasi `Dockerfile` backend PHP-FPM dengan prinsip *least privilege* (user non-root `www-data`, ekstensi PDO terisolasi).
+- [x] Mengonfigurasi `Dockerfile` reverse proxy Nginx beserta template pengerasan konfigurasi (`nginx.conf`).
+- [x] Menyusun skrip otomatisasi sertifikat TLS mandiri (`scripts/gen-certs.sh`) dan pengujian kesehatan (`scripts/smoke-test.sh`).
+- [x] Menyusun dokumentasi infrastruktur dan panduan kontainer di `docs/INFRA/README.md`.
+
+---
+
+### 3. Apa yang BELUM Diimplementasikan (Backlog / Action Items)
+
+Berikut adalah daftar pekerjaan yang perlu diselesaikan menuju **Milestone 3** dan **Milestone 4 (Final UTS)**:
+
+1. **Aktivasi Pipeline CI/CD di `.github/workflows/` (Prioritas Utama):**
+   - File template `docs/SEC-ENG/policy/pipeline/security-gate.yml` perlu diintegrasikan ke `.github/workflows/ci.yml` pada root repositori agar pemindaian (Gitleaks, Trivy, Linter, Test) berjalan otomatis pada setiap commit/PR.
+2. **Generasi Dokumen SBOM (`/sbom`):**
+   - Developer perlu meng-generate dokumen SBOM berstandar CycloneDX JSON (`backend-sbom.cdx.json` dan `frontend-sbom.cdx.json`) dan meletakkannya di folder `/sbom`.
+3. **Penyimpanan Artefak Hasil Audit Pemindaian (`/reports`):**
+   - Menjalankan pemindaian nyata (Gitleaks, Trivy, Semgrep/SonarQube) dan mendokumentasikan log/laporan resmi (format SARIF/JSON/PDF) ke folder `docs/SEC-ENG/reports/`.
+4. **Uji Coba Integrasi Kontainer Runtime (Docker Run & Test):**
+   - Menjalankan dan memvalidasi `docker-compose.yml` di environment lokal/VPS untuk memastikan kontainer frontend, backend, dan database MySQL terhubung lancar di jaringan privat `axon-network`.
+5. **Penyempurnaan Modul Bisnis DSS:**
+   - Menambahkan endpoint visualisasi agregasi status pesanan pengiriman (*Order Fulfillment*) dan rasio stok vs permintaan barang (*Inventory Health*).
+6. **Threat Modeling Versi 2 (v2):**
+   - Menyusun dokumen `Threat-Modelling-V2.md` yang mencatat evaluasi risiko pasca-mitigasi dan kesiapan deployment final.
+
+---
 ## 🚀 Panduan Menjalankan Projek (Axon DSS)
 
 Ikuti langkah-langkah berikut secara berurutan untuk menjalankan database, backend, dan frontend di lingkungan lokal:
