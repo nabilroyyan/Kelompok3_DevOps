@@ -33,7 +33,7 @@ ENV VITE_API_URL=${VITE_API_URL}
 RUN npm run build
 
 # --- Stage 2: runtime --------------------------------------------------------
-FROM nginx:1.27-alpine
+FROM nginx:1.31-alpine
 
 COPY INFRA/docker/proxy/nginx.conf /etc/nginx/nginx.conf
 COPY --from=web /build/dist/ /usr/share/nginx/html/
