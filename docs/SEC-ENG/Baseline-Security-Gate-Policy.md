@@ -1,9 +1,7 @@
 # Baseline Security Gate Policy — DSS Penjualan Axon
 
-**Milestone 1 · [SEC] Define Baseline Security Gate Policies (Issue #5)**<br>
-**Stack:** Laravel (backend), React + Vite (frontend), MySQL, Nginx, Docker Compose.<br>
-**Tools:** Gitleaks, Trivy, Dependabot.<br>
-Threshold ini adalah baseline dan ditinjau ulang setelah hasil pemindaian pertama.
+**Milestone 1 · [SEC] Define Baseline Security Gate Policies (Issue #5)** <br>
+**Stack:** Laravel (backend), React + Vite (frontend), MySQL, Nginx, Docker Compose.<br> **Tools:** Gitleaks, Trivy, Dependabot. Threshold ini adalah baseline dan ditinjau ulang setelah hasil pemindaian pertama.
 
 ## 1. Prinsip
 
@@ -14,16 +12,15 @@ Security Gate adalah pemeriksaan otomatis di GitHub Actions yang **memblokir mer
 | Gate | Tool | Aturan FAIL (memblokir) | Toleransi PO |
 | :-- | :-- | :-- | :-- |
 | **G1 Secret Scan** | Gitleaks | Ada 1 secret di commit atau riwayat Git. Berjalan di *pre-commit* dan CI. | **0** |
-| **G2 Dependensi (SCA)** | Trivy `fs` | Ada CVE **Critical** (tanpa pengecualian, patch < 24 jam). CVE **High** lebih dari 1, atau tanpa waiver. | Critical **0**, High **maks 1** |
+| **G2 Dependensi (SCA)** | Trivy `fs` | Ada CVE **Critical** (tanpa pengecualian, patch < 24 jam). | Critical **0** |
 | **G3 Kebijakan Container** | `policy/scripts/check-infra-policy.sh` | Container berjalan sebagai root. Database memakai `ports`. Password atau `APP_KEY` literal di compose. `APP_DEBUG=true`. Query mentah yang menyambung variabel. | Root **0**, SQLi **0** |
-| **G4 Image Docker** | Trivy `image` | Image `app`, `proxy`, dan `db` memuat CVE Critical, atau High tanpa waiver. | Critical **0**, High **maks 1** |
+| **G4 Image Docker** | Trivy `image` | Image `app`, `proxy`, dan `db` memuat CVE Critical. | Critical **0** |
 
-CVE **Medium/Low** tidak memblokir. Hasilnya dicatat ke backlog mitigasi.
+CVE **High, Medium, dan Low** belum memblokir. Hasilnya dilaporkan dan dicatat ke backlog mitigasi.
 
 ## 3. Aturan Utama
 
 - **Trivy:** build **GAGAL bila ada Critical**. Critical tanpa patch tetap memblokir (`ignore-unfixed: false`).
-- **Waiver High:** hanya untuk CVE High, **maksimal 1 entri aktif**, tertulis, bertanggal kedaluwarsa (disarankan ≤ 30 hari), dan disetujui PO. CI menghitung entri dan gagal bila lebih dari 1. **Critical, secret, dan SQLi tidak boleh di-waiver.**
 - **Gitleaks:** rule bawaan ditambah rule proyek untuk connection string dan password MySQL serta `APP_KEY` Laravel. Pemindaian mencakup seluruh riwayat commit. Secret yang sudah ter-commit wajib **dirotasi**, karena menghapus commit tidak cukup. Hanya `.env.example` tanpa nilai asli yang boleh masuk Git.
 - **SQL Injection:** semua query wajib memakai Query Builder/Eloquent dengan binding (parameterized). G3 menggagalkan build bila ada query mentah yang menyambung variabel, dan Pull Request yang melanggar ditolak saat review kode. Pemindai SAST khusus (Semgrep atau SonarQube) boleh ditambahkan setelah tahap dasar ini stabil.
 - **Dependabot:** diaktifkan untuk Composer, npm, dan Dockerfile. Dia memberi alert dan membuat PR perbaikan otomatis, tetapi bukan gate pemblokir.
@@ -32,7 +29,7 @@ CVE **Medium/Low** tidak memblokir. Hasilnya dicatat ke backlog mitigasi.
 
 ## 4. Konfigurasi di Folder `/policy`
 
-`gitleaks.toml` · `trivy.yaml` (Critical) · `trivy-high.yaml` dan `.trivyignore` (High + waiver) · `pre-commit-config.yaml` · `dependabot.yml` · `scripts/check-infra-policy.sh` (G3) · `pipeline/security-gate.yml` (draf workflow, belum aktif)
+`gitleaks.toml` · `trivy.yaml` (gate Critical) · `pre-commit-config.yaml` · `dependabot.yml` · `scripts/check-infra-policy.sh` (G3) · `pipeline/security-gate.yml` (draf workflow, belum aktif)
 
 ## 5. Prasyarat Sebelum Gate Diaktifkan
 
