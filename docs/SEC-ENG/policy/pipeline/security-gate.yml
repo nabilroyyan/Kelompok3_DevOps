@@ -1,0 +1,145 @@
+# Baseline Security Gate - Axon DSS (Issue #5, Milestone 1)
+# Salin ke .github/workflows/security-gate.yml saat pipeline CI/CD diaktifkan.
+# Secrets repo yang dibutuhkan: SONAR_TOKEN, SONAR_HOST_URL.
+# Catatan: pin versi action ke commit SHA sebelum produksi (mitigasi T-11).
+
+name: security-gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---- Gate 1: Secret Scanning (T-06) ----
+  secret-scan:
+    name: Gate 1 - Secret Scan (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # scan seluruh riwayat commit, bukan hanya HEAD
+      - name: Gitleaks
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest detect \
+            --source=/repo --config=/repo/policy/gitleaks.toml \
+            --redact --verbose --exit-code 1 \
+            --report-format sarif --report-path /repo/gitleaks.sarif
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gitleaks-report
+          path: gitleaks.sarif
+          if-no-files-found: ignore
+
+  # ---- Gate 2: SAST SonarQube (T-02, T-06, T-07) ----
+  sast-sonarqube:
+    name: Gate 2 - SAST (SonarQube Quality Gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # wajib untuk deteksi "new code" SonarQube
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'          # sesuaikan dengan versi PHP proyek
+          coverage: pcov              # untuk laporan coverage PHPUnit
+          extensions: mbstring, pdo_sqlite
+      - name: Install dependensi Laravel
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Siapkan env pengujian (SQLite in-memory, tanpa secret nyata)
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+      - name: PHPUnit + coverage (clover & junit)
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ":memory:"
+        run: |
+          mkdir -p coverage
+          vendor/bin/phpunit --coverage-clover coverage/clover.xml --log-junit coverage/junit.xml
+      - name: SonarQube scan (menunggu Quality Gate)
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          projectBaseDir: .
+          args: >
+            -Dproject.settings=policy/sonarqube/sonar-project.properties
+            -Dsonar.qualitygate.wait=true
+
+  # ---- Gate 3: SCA dependensi + SBOM (T-11) ----
+  sca-dependencies:
+    name: Gate 3 - SCA & SBOM (Trivy fs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/setup-trivy@v0.2.2
+      - name: Trivy fs - FAIL jika ada CRITICAL (membaca composer.lock)
+        run: trivy fs --config policy/trivy.yaml .
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+      - name: Composer audit (informasi pembanding, tidak memblokir)
+        if: always()
+        run: composer audit --locked --no-dev || true
+      - name: Laporan HIGH (tidak memblokir, untuk triase)
+        if: always()
+        run: trivy fs --scanners vuln --severity HIGH --exit-code 0 --format table .
+      - name: Generate SBOM (CycloneDX)
+        if: always()
+        run: trivy fs --format cyclonedx --output sbom.cdx.json .
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sbom-cyclonedx
+          path: sbom.cdx.json
+          if-no-files-found: ignore
+
+  # ---- Gate 4: Kebijakan infrastruktur (T-05, T-10, T-06) ----
+  infra-policy:
+    name: Gate 4 - Infra Policy (DB isolasi, non-root)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install pyyaml
+      - name: Cek kebijakan infra, Laravel, dan Bootstrap (SRI)
+        run: bash policy/scripts/check-infra-policy.sh docker-compose.yml
+
+  # ---- Gate 5: Container image scan (T-10, T-11) ----
+  image-scan:
+    name: Gate 5 - Container Image Scan (Trivy)
+    runs-on: ubuntu-latest
+    needs: [secret-scan, infra-policy]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/setup-trivy@v0.2.2
+      - name: Build dan scan setiap Dockerfile
+        run: |
+          shopt -s nullglob
+          files=$(find . -name 'Dockerfile' -not -path './node_modules/*')
+          if [ -z "$files" ]; then echo "Belum ada Dockerfile, gate dilewati"; exit 0; fi
+          rc=0
+          for f in $files; do
+            name="axon-$(echo "$(dirname "$f")" | tr -c 'a-z0-9\n' '-' | sed 's/^-*//;s/-*$//')"
+            docker build -t "$name:ci" -f "$f" "$(dirname "$f")"
+            trivy image --config policy/trivy.yaml "$name:ci" || rc=1
+          done
+          exit $rc
+
+  # ---- Ringkasan: satu status wajib untuk branch protection ----
+  security-gate-passed:
+    name: Security Gate - PASSED
+    runs-on: ubuntu-latest
+    needs: [secret-scan, sast-sonarqube, sca-dependencies, infra-policy, image-scan]
+    steps:
+      - run: echo "Seluruh Security Gate lulus."

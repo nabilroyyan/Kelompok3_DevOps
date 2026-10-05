@@ -1,0 +1,160 @@
+# =============================================================================
+# Kelompok 3 DevOps — .gitignore tingkat repositori
+#
+# MENGAPA BERKAS INI ADA DI ROOT
+#   Sebelumnya hanya ada .gitignore di dalam tiap aplikasi (Laravel bawaan) dan
+#   di docs/INFRA/. Akibatnya tidak ada satu pun lapisan yang mencegah:
+#     - berkas rahasia (.env) di lokasi baru yang belum punya .gitignore sendiri,
+#     - sampah sistem operasi (.DS_Store) yang sempat ter-commit,
+#     - node_modules/vendor/cache bila dibuat di direktori yang tidak terduga.
+#   Berkas ini adalah jaring pengaman terakhir untuk seluruh repositori.
+#
+# ATURAN YANG DIPEGANG
+#   1. Zero Tolerance kredensial bocor (docs/PO/1.2 Risk.md) - rahasia tidak
+#      boleh masuk Git dalam bentuk apa pun.
+#   2. Public key BOLEH di-commit, private key TIDAK (docs/PO/1. Project-Overview.md,
+#      folder `keys/`: "PUBLIC keys only! DILARANG private keys").
+#   3. Jangan mengabaikan berkas yang memang harus ada di repositori. Setiap pola
+#      di bawah sudah diuji dengan `git check-ignore` terhadap seluruh berkas yang
+#      saat ini ter-track, agar tidak ada bukti/policy yang ikut terabaikan.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. RAHASIA & KREDENSIAL  (Zero Tolerance - docs/PO/1.2 Risk.md)
+# -----------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+!*.env.example
+
+# Berkas rahasia umum di lingkungan container/CI
+*.env.local
+.envrc
+docker-compose.override.yml
+
+# Private key & keystore - HANYA ini yang dilarang; public key tetap boleh
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+!id_rsa.pub
+!id_ed25519.pub
+*_rsa
+*_ed25519
+
+# Berkas kredensial layanan cloud
+.aws/
+.azure/
+gcloud/
+*credentials*.json
+!*credentials*.example.json
+service-account*.json
+
+# -----------------------------------------------------------------------------
+# 2. SAMPAH SISTEM OPERASI
+#    (lima berkas .DS_Store berikut sebelumnya ter-track dan sudah dihapus dari
+#    indeks dengan `git rm --cached`; pola ini mencegahnya kembali)
+# -----------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+.AppleDouble
+.LSOverride
+Icon?
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*~
+*.swp
+*.swo
+
+# -----------------------------------------------------------------------------
+# 3. EDITOR & IDE
+# -----------------------------------------------------------------------------
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.iml
+*.code-workspace
+.project
+.classpath
+.settings/
+nbproject/
+
+# -----------------------------------------------------------------------------
+# 4. DEPENDENSI (dipasang ulang dari lockfile saat build)
+# -----------------------------------------------------------------------------
+node_modules/
+vendor/
+bower_components/
+jspm_packages/
+.pnpm-store/
+
+# -----------------------------------------------------------------------------
+# 5. HASIL BUILD & CACHE
+# -----------------------------------------------------------------------------
+dist/
+build/
+out/
+public/build/
+public/hot
+public/storage
+coverage/
+.nyc_output/
+*.tsbuildinfo
+.eslintcache
+.stylelintcache
+.cache/
+.parcel-cache/
+.phpunit.result.cache
+.phpunit.cache/
+.php-cs-fixer.cache
+.scannerwork/
+
+# Cache & sesi runtime Laravel (isi direktori, bukan berkas .gitignore-nya)
+# `.gitignore` di dalam direktori tersebut tetap ter-track seperti semula.
+**/bootstrap/cache/*.php
+**/storage/framework/cache/data/*
+**/storage/framework/sessions/*
+**/storage/framework/views/*
+**/storage/logs/*.log
+
+# -----------------------------------------------------------------------------
+# 6. LOG & BERKAS SEMENTARA
+# -----------------------------------------------------------------------------
+# `/logs/` (dengan garis miring di depan) HANYA berlaku untuk folder logs di root.
+# Sebelumnya ditulis `logs/` tanpa garis miring sehingga ikut mengabaikan
+# storage/logs/ milik Laravel — termasuk berkas .gitignore bawaan yang WAJIB
+# tetap ter-track agar struktur direktori storage tidak hilang dari repositori.
+/logs/
+tmp/
+temp/
+*.log
+!docs/**/*.log
+
+# Pengaman eksplisit: berkas .gitignore bawaan framework harus selalu ter-track,
+# karena berkas itulah yang mempertahankan direktori kosong di repositori.
+!**/storage/logs/.gitignore
+!**/bootstrap/cache/.gitignore
+
+# Bersihkan pengecualian di atas hanya untuk folder bukti yang memang di-commit
+!docs/SEC-ENG/reports/**
+!docs/INFRA/evidence/**
+
+# -----------------------------------------------------------------------------
+# 7. LINGKUNGAN PYTHON (dipakai skrip policy/gate)
+# -----------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/

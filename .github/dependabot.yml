@@ -1,0 +1,59 @@
+# =============================================================================
+# Dependabot — menjaga pin rantai pasok tetap terbarui  (mitigasi T-11)
+#
+# MENGAPA BERKAS INI PENTING
+#   .github/workflows/ci.yml memakai action yang di-pin ke commit SHA
+#   dan image tool yang di-pin ke versi tertentu. Pinning menutup risiko tag
+#   dipindahkan ke kode berbahaya, TETAPI membuat kita tidak otomatis menerima
+#   patch keamanan pada action/tool itu sendiri. Dependabot menutup celah
+#   tersebut: pin tetap kaku, namun ada Pull Request berkala untuk memperbarui.
+#
+#   Ini pasangan wajib dari strategi pinning — tanpa Dependabot, pin justru
+#   berubah dari kontrol keamanan menjadi utang teknis.
+# =============================================================================
+
+version: 2
+updates:
+  # Action pada workflow Security Gate
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore(ci)'
+    labels:
+      - dependencies
+      - security
+    groups:
+      github-actions:
+        patterns: ['*']
+
+  # Base image pada image backend (php) dan reverse proxy (node, nginx)
+  - package-ecosystem: docker
+    directories:
+      - /docs/INFRA/docker/app
+      - /docs/INFRA/docker/proxy
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore(infra)'
+    labels:
+      - dependencies
+      - security
+
+  # Image pada orkestrasi Compose (mis. mysql:8.0)
+  - package-ecosystem: docker-compose
+    directory: /docs/INFRA
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore(infra)'
+    labels:
+      - dependencies
+      - security
