@@ -1,0 +1,394 @@
+# =============================================================================
+# Axon DSS — Security Gate pipeline (Tugas 4 peran Infrastructure Engineer)
+#
+# DASAR
+#   Template dari Security Engineer: docs/SEC-ENG/policy/pipeline/security-gate.yml
+#   Gate rules: docs/PO/1.2 Risk.md (Zero Tolerance: kredensial bocor, CVE
+#   Critical, SQLi, privilege container).
+#
+# MENGAPA BERKAS INI ADA DI ROOT (.github/workflows/)
+#   GitHub Actions hanya membaca workflow dari .github/workflows/ pada root
+#   repositori. Berkas di sub-folder (mis. docs/INFRA/) TIDAK akan pernah
+#   dieksekusi. Struktur resmi pada README.md juga menempatkan .github/workflows
+#   di root. Karena itu berkas ini di sini, sementara konfigurasi lain tetap di
+#   docs/INFRA/.
+#
+# MENGAPA NAMANYA ci.yml
+#   Backlog PO pada README.md bagian "Apa yang BELUM Diimplementasikan" butir 1
+#   secara eksplisit menunjuk path .github/workflows/ci.yml, sehingga nama itu
+#   yang dipakai agar dokumen dan repositori menunjuk berkas yang sama.
+#   Nama workflow di dalam berkas ini tetap "security-gate" karena itulah yang
+#   bermakna di tab Actions dan menjadi dasar penamaan job ringkasan.
+#
+# PERBEDAAN DARI TEMPLATE SECURITY (dan alasannya)
+#   1. PHP 8.4 (template memakai 8.3). composer.lock mengunci symfony/console
+#      v8.1.8 dan 19 paket produksi lain yang mensyaratkan php >= 8.4.1,
+#      sehingga `composer install` GAGAL di PHP 8.3.
+#   2. Path disesuaikan: policy/ -> docs/SEC-ENG/policy/
+#                        app/    -> docs/Dev/axon-devsecops-dss/app/
+#                        compose -> docs/INFRA/docker-compose.yml
+#   3. trivy.yaml menyebut `ignorefile: policy/.trivyignore` yang relatif
+#      terhadap CWD; di sini di-override eksplisit lewat --ignorefile.
+#   4. Gate 5 memakai `docker compose build`, bukan build per-Dockerfile,
+#      karena konteks build kedua image adalah folder docs/.
+#   5. Gate 2 (SAST) NON-BLOCKING untuk sementara: Quality Gate
+#      Axon-DSS-Baseline mensyaratkan new_coverage >= 70%, sedangkan saat ini
+#      baru ada 2 berkas tes skeleton Laravel. Setelah Developer menambah tes,
+#      hapus continue-on-error pada job sast-sonar untuk menjadikannya gate.
+#   6. Ditambahkan Hadolint (lint Dockerfile) dan pemeriksaan T-02 dari root
+#      aplikasi, yang belum ada di template.
+#
+# KEAMANAN RANTAI PASOK (T-11)
+#   Seluruh action di-pin ke commit SHA, bukan tag yang bisa dipindahkan.
+#   Tool pihak ketiga (Gitleaks, Trivy, Hadolint) dipanggil sebagai image dengan
+#   versi ter-pin. Dependabot diatur di .github/dependabot.yml agar pin tetap
+#   terbarui — tanpa itu, pin justru berisiko melewatkan patch keamanan.
+# =============================================================================
+
+name: security-gate
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+
+# Default paling sempit; job yang butuh menulis hanya menambah seperlunya.
+permissions:
+  contents: read
+
+concurrency:
+  group: security-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COMPOSE_FILE: docs/INFRA/docker-compose.yml
+  POLICY_DIR: docs/SEC-ENG/policy
+  APP_BACKEND: docs/Dev/axon-devsecops-dss/app/backend
+
+  # Tool dipin agar hasil lokal dan pipeline identik (Bab 3: gate yang dapat
+  # direproduksi). Versi yang sama dipakai docs/INFRA/scripts/run-gates-local.sh.
+  TRIVY_IMAGE: aquasec/trivy:0.58.0
+  GITLEAKS_IMAGE: zricethezav/gitleaks:v8.28.0
+  HADOLINT_IMAGE: hadolint/hadolint:2.12.0-debian
+
+  # SonarCloud: SONAR_TOKEN adalah secret; dua nilai lain cukup sebagai
+  # repository variable (Settings > Secrets and variables > Actions > Variables).
+  SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+  SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Gate 1 — Secret Scanning (ZERO TOLERANCE, docs/PO/1.2 Risk.md)
+  # ---------------------------------------------------------------------------
+  secret-scan:
+    name: Gate 1 - Secret Scan (Gitleaks)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # untuk mengunggah SARIF ke tab Security
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0 # pindai seluruh riwayat commit, bukan hanya HEAD
+
+      - name: Gitleaks detect
+        run: |
+          docker run --rm -v "$PWD:/repo" "$GITLEAKS_IMAGE" detect \
+            --source=/repo \
+            --config="/repo/$POLICY_DIR/gitleaks.toml" \
+            --redact --no-banner --exit-code 1 \
+            --report-format sarif --report-path /repo/gitleaks.sarif
+
+      # Diunggah walau gate gagal supaya temuan tetap bisa ditelusuri di tab
+      # Security. continue-on-error: bila repo dijadikan privat, unggah SARIF
+      # memerlukan GitHub Advanced Security; jangan sampai itu memblokir gate.
+      - name: Unggah SARIF ke tab Security
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@1190a975f95ce23525efb6a3fc21ea29567c1b52 # v3
+        with:
+          sarif_file: gitleaks.sarif
+          category: gitleaks
+
+      - name: Simpan laporan sebagai artefak
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gitleaks-sarif
+          path: gitleaks.sarif
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # Gate 2 — SAST (SonarCloud) — NON-BLOCKING sementara, lihat catatan #5
+  # ---------------------------------------------------------------------------
+  sast-sonar:
+    name: Gate 2 - SAST (SonarCloud, non-blocking sampai tes tersedia)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0 # wajib agar SonarCloud dapat menghitung "new code"
+
+      - name: Siapkan PHP 8.4
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.4' # harus >= 8.4.1, lihat catatan #1
+          coverage: pcov
+          extensions: mbstring, pdo_sqlite
+          tools: composer:v2
+
+      - name: Pasang dependensi Laravel
+        working-directory: ${{ env.APP_BACKEND }}
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Siapkan .env pengujian (SQLite in-memory, tanpa secret nyata)
+        working-directory: ${{ env.APP_BACKEND }}
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      # Best-effort: tes saat ini masih skeleton, jadi kegagalan tes tidak boleh
+      # menghalangi scan. Setelah Developer menambah tes, hapus continue-on-error
+      # agar coverage ikut dinilai.
+      - name: PHPUnit + coverage
+        continue-on-error: true
+        working-directory: ${{ env.APP_BACKEND }}
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ':memory:'
+        run: |
+          mkdir -p coverage
+          vendor/bin/phpunit --coverage-clover coverage/clover.xml --log-junit coverage/junit.xml
+
+      - name: Catat status kredensial SonarCloud
+        env:
+          SONAR_TOKEN_CHECK: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -z "$SONAR_TOKEN_CHECK" ]; then
+            echo "::warning title=Gate 2 belum aktif::SONAR_TOKEN belum diset sehingga job SonarCloud dilewati. Isi secret tersebut untuk mengaktifkan SAST."
+            echo "SONAR_READY=false" >> "$GITHUB_ENV"
+          else
+            echo "SONAR_READY=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: SonarCloud scan
+        if: env.SONAR_READY == 'true'
+        uses: SonarSource/sonarqube-scan-action@2f77a1ec69fb1d595b06f35ab27e97605bdef703 # v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          # projectBaseDir diarahkan ke root aplikasi Laravel agar properti
+          # sonar.sources pada berkas milik Security Engineer tetap valid apa
+          # adanya (app,routes,resources,config,database,public).
+          projectBaseDir: ${{ env.APP_BACKEND }}
+          args: >
+            -Dproject.settings=${{ github.workspace }}/docs/SEC-ENG/policy/sonarqube/sonar-project.properties
+            -Dsonar.organization=${{ env.SONAR_ORGANIZATION }}
+            -Dsonar.qualitygate.wait=true
+
+      - name: Simpan laporan SonarCloud
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sonar-report
+          path: |
+            docs/Dev/axon-devsecops-dss/app/backend/coverage/
+            docs/Dev/axon-devsecops-dss/app/backend/.scannerwork/report-task.txt
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # Gate 3 — SCA dependensi + SBOM (T-11, Prioritas P1 pada 2.1 Dev Analysis)
+  # ---------------------------------------------------------------------------
+  sca-sbom:
+    name: Gate 3 - SCA & SBOM (Trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # --config + --ignorefile eksplisit (catatan #3). Config milik Security
+      # sudah menyetel severity CRITICAL, exit-code 1, dan scanners vuln+misconfig.
+      - name: Trivy fs — CRITICAL memblokir
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src "$TRIVY_IMAGE" fs \
+            --config "/src/$POLICY_DIR/trivy.yaml" \
+            --ignorefile "/src/$POLICY_DIR/.trivyignore" \
+            --format table \
+            /src
+
+      - name: Trivy fs — laporan HIGH (informatif, untuk triase)
+        if: always()
+        continue-on-error: true
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src "$TRIVY_IMAGE" fs \
+            --scanners vuln --severity HIGH --exit-code 0 --format table \
+            --ignorefile "/src/$POLICY_DIR/.trivyignore" \
+            /src
+
+      - name: Trivy fs — laporan SARIF
+        if: always()
+        continue-on-error: true
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo "$TRIVY_IMAGE" fs \
+            --scanners vuln --severity CRITICAL,HIGH --exit-code 0 \
+            --ignorefile "/repo/$POLICY_DIR/.trivyignore" \
+            --format sarif --output /repo/trivy-fs.sarif \
+            /repo
+
+      - name: Unggah SARIF SCA ke tab Security
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@1190a975f95ce23525efb6a3fc21ea29567c1b52 # v3
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs
+
+      # SBOM ditulis di luar pohon repo agar status Git tetap bersih; hasilnya
+      # diunggah sebagai artefak pipeline.
+      - name: Hasilkan SBOM CycloneDX (backend + frontend)
+        run: OUT_DIR="$RUNNER_TEMP/sbom" bash docs/INFRA/scripts/generate-sbom.sh
+
+      - name: Simpan SBOM sebagai artefak
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sbom-cyclonedx
+          path: ${{ runner.temp }}/sbom/
+          if-no-files-found: warn
+
+  # ---------------------------------------------------------------------------
+  # Gate 4 — Kebijakan infrastruktur + lint Dockerfile
+  # ---------------------------------------------------------------------------
+  infra-policy:
+    name: Gate 4 - Infra Policy & Dockerfile Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Pasang PyYAML (dibutuhkan check-infra-policy.sh)
+        run: pip install pyyaml
+
+      - name: Siapkan .env CI (nilai dummy, bukan rahasia)
+        run: |
+          # docker compose config/build meng-interpolasi ${VAR:?...}; berkas ini
+          # hanya memakai placeholder yang sudah ada di .env.example.
+          cp docs/INFRA/.env.example docs/INFRA/.env
+          docker compose -f "$COMPOSE_FILE" config -q
+
+      - name: Kebijakan infra (T-05, T-06, T-07, T-10, T-11)
+        run: bash "$POLICY_DIR/scripts/check-infra-policy.sh" "$COMPOSE_FILE"
+
+      # Dijalankan dari root aplikasi karena skrip mencari folder app/ dan
+      # routes/ relatif terhadap CWD — di sinilah kontrol T-02 (raw query
+      # berinterpolasi) dan T-11 (SRI) benar-benar diperiksa.
+      - name: Kebijakan kode Laravel (T-02, T-11)
+        working-directory: ${{ env.APP_BACKEND }}
+        run: bash "$GITHUB_WORKSPACE/$POLICY_DIR/scripts/check-infra-policy.sh" "$GITHUB_WORKSPACE/$COMPOSE_FILE"
+
+      - name: Hadolint (lint kedua Dockerfile)
+        run: |
+          fail=0
+          while IFS= read -r dockerfile; do
+            echo "--- $dockerfile"
+            # DL3018 diabaikan sadar: versi paket apk mengikuti base image;
+            # memaksa pin per paket membuat image cepat usang dan menghambat
+            # penyerapan patch keamanan.
+            if docker run --rm -i "$HADOLINT_IMAGE" hadolint --ignore DL3018 - < "$dockerfile"; then
+              echo "[OK] Hadolint bersih"
+            else
+              echo "::error file=$dockerfile::Hadolint menemukan masalah"
+              fail=1
+            fi
+          done < <(find docs/INFRA/docker -type f -name 'Dockerfile' | sort)
+          exit $fail
+
+  # ---------------------------------------------------------------------------
+  # Gate 5 — Container Image Scan (T-10, T-11)
+  # ---------------------------------------------------------------------------
+  image-scan:
+    name: Gate 5 - Container Image Scan (Trivy)
+    runs-on: ubuntu-latest
+    needs: [secret-scan, infra-policy]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Siapkan .env CI (nilai dummy, bukan rahasia)
+        run: cp docs/INFRA/.env.example docs/INFRA/.env
+
+      # Build lewat Compose (bukan per-Dockerfile) karena konteks build kedua
+      # image adalah folder docs/ — lihat catatan #4.
+      - name: Build image
+        run: docker compose -f "$COMPOSE_FILE" build
+
+      # Daftar image diturunkan dari Compose, bukan ditulis manual, supaya gate
+      # tetap benar bila suatu saat ada service ditambah/diganti nama.
+      # Image yang kita bangun sendiri diberi prefix nama proyek Compose
+      # (axon-dss-*) dan diperlakukan sebagai gate yang memblokir; image upstream
+      # (mis. mysql) dilaporkan informatif karena temuannya bukan kendali kita.
+      #
+      # Image diekspor ke tar lalu dipindai dari tar itu, sehingga Trivy tidak
+      # perlu akses ke /var/run/docker.sock — privilege pemindai lebih sedikit.
+      - name: Scan image (CRITICAL memblokir untuk image yang kita bangun)
+        run: |
+          set -u
+          fail=0
+          images=$(docker compose -f "$COMPOSE_FILE" config --images | sort -u)
+          echo "Image dari Compose:"; echo "$images" | sed 's/^/  /'; echo
+
+          for image in $images; do
+            case "$image" in
+              axon-dss-*) blocking=1 ;;
+              *)          blocking=0 ;;
+            esac
+
+            safe_name=$(echo "$image" | tr '/:' '__')
+            tar="/tmp/${safe_name}.tar"
+            echo "=== ${image} (blocking=${blocking}) ==="
+
+            docker pull "$image" >/dev/null 2>&1 || true
+            docker save "$image" -o "$tar"
+
+            if [ "$blocking" = "1" ]; then
+              if docker run --rm \
+                    -v "${tar}:/image.tar:ro" \
+                    -v "$PWD/$POLICY_DIR:/policy:ro" \
+                    "$TRIVY_IMAGE" image \
+                      --input /image.tar \
+                      --config /policy/trivy.yaml \
+                      --ignorefile /policy/.trivyignore; then
+                echo "[PASS] Tidak ada CRITICAL pada ${image}"
+              else
+                echo "::error title=Container scan gagal::${image} memiliki temuan CRITICAL"
+                fail=1
+              fi
+            else
+              # Informatif: tetap terlihat, tidak memblokir.
+              docker run --rm -v "${tar}:/image.tar:ro" "$TRIVY_IMAGE" image \
+                --input /image.tar --severity CRITICAL,HIGH --exit-code 0 --format table \
+                || echo "(laporan informatif gagal, tidak memblokir)"
+            fi
+          done
+          exit $fail
+
+  # ---------------------------------------------------------------------------
+  # Ringkasan — satu status wajib untuk branch protection
+  # ---------------------------------------------------------------------------
+  security-gate-passed:
+    name: Security Gate - PASSED
+    runs-on: ubuntu-latest
+    needs: [secret-scan, sast-sonar, sca-sbom, infra-policy, image-scan]
+    steps:
+      - name: Ringkasan
+        run: |
+          echo "Seluruh gate yang memblokir telah lulus."
+          echo "Catatan: Gate 2 (SAST SonarCloud) masih non-blocking sampai tes tersedia."
+          echo "Rincian risiko residual ada di docs/INFRA/docs/laporan-infra.md."
