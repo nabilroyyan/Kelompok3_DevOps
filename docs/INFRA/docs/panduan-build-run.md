@@ -1,6 +1,6 @@
 # Panduan Build, Run, Verifikasi, dan Deploy
 
-Dokumen ini adalah langkah operasional untuk artefak di `docs/Infra/`.
+Dokumen ini adalah langkah operasional untuk artefak di `docs/INFRA/`.
 Semua perintah di bawah **belum dijalankan** pada sesi penyusunan artefak ini —
 urutan dan hasil yang diharapkan ditulis eksplisit supaya mudah dibuktikan
 sekaligus mudah dilaporkan sebagai bukti praktikum.
@@ -17,6 +17,7 @@ sekaligus mudah dilaporkan sebagai bukti praktikum.
 | `openssl` | `openssl version` | Dipakai `scripts/gen-certs.sh` |
 | Ruang disk | `docker system df` | Image Nginx + PHP + Node build ± 1 GB |
 | Akses internet | — | Diperlukan saat build (pull base image, `composer install`, `npm ci`) |
+| PHP 8.4 **>= 8.4.1** | `docker run --rm php:8.4-cli php -v` (opsional) | Bukan untuk host, tetapi jadi acuan: `composer.lock` mensyaratkan >= 8.4.1, dan image backend memakai `ARG PHP_VERSION=8.4`. Host tidak perlu memasang PHP. |
 
 > Build pertama adalah yang paling lama karena harus menarik base image dan
 > memasang dependensi PHP serta Node. Build berikutnya jauh lebih cepat karena
@@ -27,7 +28,7 @@ sekaligus mudah dilaporkan sebagai bukti praktikum.
 ## 1. Konfigurasi
 
 ```bash
-cd docs/Infra
+cd docs/INFRA
 cp .env.example .env
 ```
 
@@ -36,7 +37,7 @@ Isi nilai berikut pada `.env`:
 | Variabel | Wajib | Nilai contoh | Keterangan |
 | :--- | :---: | :--- | :--- |
 | `MYSQL_ROOT_PASSWORD` | ✅ | string acak kuat | Hanya untuk administrasi di dalam container |
-| `DB_PASSWORD` | ✅ | string acak kuat | Dipakai aplikasi (`DB_USERNAME`, default `axon`) |
+| `DB_PASSWORD` | ✅ | string acak kuat | Dipakai aplikasi (`DB_USERNAME`, default `dss_user`). User ini **hanya punya hak `SELECT`** — lihat §5.5 |
 | `APP_KEY` | ✅ | `base64:...` | Boleh dikosongkan — `scripts/up.sh` akan mengisinya otomatis |
 | `APP_HOST` | ✅ | `localhost` | Menentukan CN/SAN sertifikat development |
 | `PUBLISH_ADDR` | — | `0.0.0.0` | `127.0.0.1` bila Nginx host yang menjadi pintu masuk publik |
@@ -64,8 +65,8 @@ Hasil yang diharapkan:
 
 ```text
 [certs] sertifikat development dibuat untuk host 'localhost'
-[certs]   certificate : .../docs/Infra/certs/fullchain.pem
-[certs]   private key : .../docs/Infra/certs/privkey.pem  (JANGAN di-commit)
+[certs]   certificate : .../docs/INFRA/certs/fullchain.pem
+[certs]   private key : .../docs/INFRA/certs/privkey.pem  (JANGAN di-commit)
 [certs]   status      : DEVELOPMENT (self-signed, bukan CA tepercaya)
 ```
 
@@ -165,6 +166,37 @@ Perintah manual beserta **hasil yang diharapkan**:
 | 14 | `docker compose exec db sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" -e "SHOW TABLES;"'` | 8 tabel `classicmodels` | Bukti Tugas 1 |
 | 15 | `docker compose exec db sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" -e "SELECT COUNT(*) FROM orders;"'` | jumlah baris > 0 (dataset `classicmodels` standar: 326) | Bukti DB terisi |
 | 16 | `docker compose logs --tail 5 proxy` | baris JSON dengan `ts`, `ip`, `req_id`, `method`, `path`, `status`, `rt`, `bytes`, `ua` | LOG-1..LOG-3 |
+| 17 | `docker compose exec db sh -c 'mysql --protocol=socket -uroot -p"$MYSQL_ROOT_PASSWORD" -e "SHOW GRANTS FOR '\''dss_user'\''@'\''%'\'';"'` | hanya `GRANT USAGE` dan **`GRANT SELECT`**; tidak ada INSERT/UPDATE/DELETE/DROP/ALTER | Least privilege (arahan PO) |
+| 18 | `curl -kI https://localhost/ \| grep -i access-control-allow-origin` | tidak ada keluaran (deny by default) | CORS ketat (architecture §2) |
+| 19 | `docker compose exec app php -v` | PHP **8.4.x** (bukan 8.3) | PHP 8.4 (syarat `composer.lock`) |
+
+### 5.5 Konsekuensi user database `SELECT`-only
+
+`docker/db/20-app-user-privileges.sh` mencabut hak berlebih user aplikasi dan menyisakan
+`SELECT` saja, sesuai `docs/PO/1.1. Architecture.md` (Data Tier). Skrip itu **memverifikasi**
+hasilnya lewat `SHOW GRANTS`; bila masih ada hak tulis, inisialisasi database digagalkan
+sehingga container tidak pernah berjalan dengan hak berlebih.
+
+Dampak yang perlu kamu tahu:
+
+| Operasi | Bisa dilakukan `dss_user`? | Catatan |
+| :--- | :---: | :--- |
+| Query analitik dashboard (SELECT) | ✅ | Seluruh 12 endpoint read-only tetap berfungsi |
+| `php artisan migrate` | ❌ | Butuh DDL — memang disengaja |
+| Perbaikan data manual | ❌ | Pakai kredensial root (di bawah) |
+
+Dashboard tidak memerlukan migrasi: skema beserta data sudah utuh di dalam dump yang
+diimpor saat inisialisasi. Laravel tetap dapat memakai query Builder pada tabel yang ada.
+
+**Bila suatu saat benar-benar butuh DDL** (misalnya menambah indeks untuk performa),
+lakukan sekali jalan dengan kredensial root, jangan dengan membuka hak `dss_user`:
+
+```bash
+docker compose -f docs/INFRA/docker-compose.yml exec db \
+  sh -c 'mysql --protocol=socket -uroot -p"$MYSQL_ROOT_PASSWORD" classicmodels -e "ALTER TABLE orders ADD INDEX idx_orderdate (orderDate);"'
+```
+
+Hak `dss_user` tetap `SELECT`; perubahan skema tidak mengubah batas keamanan aplikasi.
 
 > **Catatan TLS-1 langkah 13.** Bila `openssl` versi lokal sudah tidak
 > mendukung `-tls1_1`, uji ini akan gagal karena alasan teknis, bukan karena
@@ -183,10 +215,10 @@ Perintah tersebut menjalankan dua artefak milik Security Engineer:
 
 ```bash
 # Gate 4 — kebijakan infra (dijalankan dari root repositori)
-bash docs/SEC-ENG/policy/scripts/check-infra-policy.sh docs/Infra/docker-compose.yml
+bash docs/SEC-ENG/policy/scripts/check-infra-policy.sh docs/INFRA/docker-compose.yml
 
-# Verifikasi deployment TLS/Exposure — bukti tersimpan di docs/Infra/evidence/
-DEV_INSECURE=1 EVIDENCE_DIR=docs/Infra/evidence \
+# Verifikasi deployment TLS/Exposure — bukti tersimpan di docs/INFRA/evidence/
+DEV_INSECURE=1 EVIDENCE_DIR=docs/INFRA/evidence \
   bash docs/SEC-ENG/policy/scripts/verify-deployment.sh https://localhost
 ```
 
@@ -194,10 +226,10 @@ Keluaran `check-infra-policy.sh` yang diharapkan:
 
 ```text
 [OK] T-05: service database tidak mem-publish port ke host
-[OK] T-06: tidak ada password/APP_KEY literal di docs/Infra/docker-compose.yml
-[OK] T-07: APP_DEBUG tidak aktif di docs/Infra/docker-compose.yml
-[OK] T-10: ./docs/Infra/docker/app/Dockerfile memakai USER www-data
-[OK] T-10: ./docs/Infra/docker/proxy/Dockerfile memakai USER nginx
+[OK] T-06: tidak ada password/APP_KEY literal di docs/INFRA/docker-compose.yml
+[OK] T-07: APP_DEBUG tidak aktif di docs/INFRA/docker-compose.yml
+[OK] T-10: ./docs/INFRA/docker/app/Dockerfile memakai USER www-data
+[OK] T-10: ./docs/INFRA/docker/proxy/Dockerfile memakai USER nginx
 [OK] T-06: .env tidak ter-track di Git
 [OK] T-11: semua aset CDN memakai SRI (atau tidak ada aset CDN)
 ```
@@ -210,15 +242,87 @@ Bukti yang layak dikumpulkan untuk laporan UTS:
 - keluaran `check-infra-policy.sh` dan `verify-deployment.sh` (folder `evidence/`);
 - sampel baris access log JSON dari `docker compose logs proxy`.
 
-> `docs/Infra/evidence/` sudah masuk `.gitignore`. Simpan hasil verifikasi di
+> `docs/INFRA/evidence/` sudah masuk `.gitignore`. Simpan hasil verifikasi di
 > sana agar tidak ikut ter-commit, lalu lampirkan pada laporan.
+
+---
+
+### 6.1 Menjalankan gate yang sama secara lokal
+
+Pipeline GitHub Actions ada di [`.github/workflows/ci.yml`](../../../.github/workflows/ci.yml).
+Agar tidak perlu menunggu pipeline untuk hal yang bisa diketahui lebih cepat:
+
+```bash
+# Gate 1 (secret scan), Gate 3 (SCA + SBOM), Gate 4 (infra policy + Hadolint)
+bash docs/INFRA/scripts/run-gates-local.sh
+
+# Menambahkan Gate 5 (build image lalu scan container)
+WITH_IMAGE=1 bash docs/INFRA/scripts/run-gates-local.sh
+```
+
+Skrip memakai tool dan versi yang sama dengan pipeline (Trivy 0.58.0,
+Gitleaks v8.28.0, Hadolint 2.12.0) supaya hasil lokal dan hasil pipeline tidak
+berbeda. Laporan ditulis ke `docs/INFRA/evidence/gates-local-<waktu>.log`.
+
+Untuk mengisi folder laporan milik Security Engineer (butir 3 backlog PO pada
+`README.md`), arahkan `REPORTS_DIR` ke sana. Skrip juga menghasilkan laporan
+mesin-terbaca, bukan hanya log teks:
+
+```bash
+REPORTS_DIR=docs/SEC-ENG/reports bash docs/INFRA/scripts/run-gates-local.sh
+```
+
+| Berkas yang dihasilkan | Isi |
+| :--- | :--- |
+| `gitleaks.sarif` | Temuan secret (dapat diunggah ke tab Security GitHub) |
+| `trivy-fs.sarif` | Temuan CVE/misconfig dependensi |
+| `trivy-fs.json` | Arsip bukti terstruktur |
+| `gates-local-<waktu>.log` | Log lengkap seluruh gate |
+
+### 6.2 Menghasilkan SBOM
+
+```bash
+bash docs/INFRA/scripts/generate-sbom.sh                  # tulis ke <app>/sbom/
+OUT_DIR=/tmp/sbom bash docs/INFRA/scripts/generate-sbom.sh  # tulis ke folder lain
+bash docs/INFRA/scripts/generate-sbom.sh --stdout backend   # cetak ke layar
+```
+
+Menghasilkan CycloneDX untuk backend (`composer.lock`) dan frontend
+(`package-lock.json`). Ini menutup Prioritas P1 pada `docs/PO/2.1 Developer Analysis
+Result.md`. Kepemilikan isi SBOM tetap milik Developer (Tugas 3 mereka); skrip ini
+hanya menyediakan otomatisasinya dan **tidak** mengubah `composer.json` Developer.
+
+Berkas keluaran berada di `docs/Dev/axon-devsecops-dss/sbom/` sesuai struktur pada
+`README.md` repositori.
+
+### 6.3 Mengaktifkan Gate 2 (SonarCloud)
+
+1. Masuk ke SonarCloud, buat organisasi, lalu buat project dengan key `axon-dss-dashboard`
+   (sama dengan `sonar.projectKey` pada berkas milik Security Engineer).
+2. Buat token analisis, lalu di GitHub buka
+   *Settings → Secrets and variables → Actions*:
+   - **Secret** `SONAR_TOKEN` = token tadi.
+   - **Variable** `SONAR_ORGANIZATION` = slug organisasi SonarCloud kamu.
+   - **Variable** `SONAR_HOST_URL` = `https://sonarcloud.io` (boleh dikosongkan; default kode sudah ini).
+3. Tambahkan **branch protection** untuk `dev` dan `main` dengan required status check
+   **`Security Gate - PASSED`** supaya gate menjadi wajib.
+4. Jalankan sekali `docs/SEC-ENG/policy/sonarqube/setup-quality-gate.sh` (milik Security
+   Engineer) bila ingin memakai Quality Gate `Axon-DSS-Baseline`.
+
+Tanpa langkah 1–2, job Sonar dilewati dengan peringatan dan pipeline **tetap hijau** —
+dirancang begitu agar CI berguna sejak hari pertama.
+
+> **Yang perlu diketahui:** Gate 2 saat ini **non-blocking**, karena Quality Gate
+> mensyaratkan `new_coverage >= 70%` sedangkan tes yang ada baru dua berkas skeleton
+> Laravel. Setelah Developer menambah tes, hapus `continue-on-error` pada job
+> `sast-sonar` untuk menjadikannya gate yang memblokir.
 
 ---
 
 ## 7. Operasional harian
 
 ```bash
-cd docs/Infra
+cd docs/INFRA
 
 # Status & kesehatan
 docker compose ps
@@ -333,7 +437,7 @@ Yang perlu dipastikan setelah deploy:
 ## 9. Reset total (mulai dari nol)
 
 ```bash
-cd docs/Infra
+cd docs/INFRA
 docker compose down -v --remove-orphans
 rm -rf certs/fullchain.pem certs/privkey.pem
 bash scripts/up.sh
@@ -351,5 +455,8 @@ database akan diimpor ulang dari dump saat container `db` dibuat kembali.
 | `.env` | Kredensial runtime | ❌ (gitignored) |
 | `certs/fullchain.pem`, `certs/privkey.pem` | Sertifikat development | ❌ (gitignored) |
 | `evidence/verify-*.txt` | Bukti hasil `verify-deployment.sh` | ❌ (gitignored) |
+| `evidence/gates-local-*.log` | Bukti hasil `run-gates-local.sh` | ❌ (gitignored) |
+| `docs/SEC-ENG/reports/*.sarif`, `*.json` | Laporan audit mesin-terbaca (butir 3 backlog PO) | ✅ dimaksudkan sebagai bukti yang di-commit |
+| `docs/Dev/axon-devsecops-dss/sbom/*.cdx.json` | SBOM CycloneDX hasil `generate-sbom.sh` | boleh di-commit sebagai bukti (milik Developer) |
 | Volume `axon-dss_db-data` | Data MySQL | — (Docker) |
 | Volume `axon-dss_app-storage` | Cache/log/sesi Laravel | — (Docker) |
