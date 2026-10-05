@@ -20,7 +20,7 @@
 # =============================================================================
 
 # --- Stage 1: build frontend (Vite) ------------------------------------------
-FROM node:24-alpine AS web
+FROM node:26-alpine AS web
 WORKDIR /build
 COPY Dev/axon-devsecops-dss/app/frontend/package.json \
      Dev/axon-devsecops-dss/app/frontend/package-lock.json ./
