@@ -1,0 +1,20 @@
+# Dependabot: memberi alert dan membuat PR perbaikan dependensi otomatis.
+# Pemasangan: salin ke .github/dependabot.yml di root repo (branch default).
+# Path di bawah mengikuti struktur repo Developer dan Infra.
+version: 2
+updates:
+  - package-ecosystem: composer
+    directory: /docs/Dev/axon-devsecops-dss/app/backend
+    schedule: { interval: weekly }
+  - package-ecosystem: npm
+    directory: /docs/Dev/axon-devsecops-dss/app/frontend
+    schedule: { interval: weekly }
+  - package-ecosystem: docker
+    directory: /docs/Infra/docker/app
+    schedule: { interval: weekly }
+  - package-ecosystem: docker
+    directory: /docs/Infra/docker/proxy
+    schedule: { interval: weekly }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
