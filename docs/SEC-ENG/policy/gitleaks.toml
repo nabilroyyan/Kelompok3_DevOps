@@ -1,0 +1,46 @@
+# Gitleaks - Baseline Secret Scanning Policy (Issue #5, Milestone 1)
+# Ancaman TM v1: T-06 (kredensial DB bocor/hardcode), aset A-01 & A-06.
+# Kebijakan: temuan secret apa pun = PIPELINE FAIL (Zero Tolerance Kredensial Bocor).
+
+title = "Axon DSS - Gitleaks Baseline Policy"
+
+[extend]
+# Pakai seluruh rule bawaan Gitleaks, lalu tambah rule khusus proyek di bawah.
+useDefault = true
+
+# --- Rule khusus proyek (PostgreSQL / classicmodels / Docker) ---
+
+[[rules]]
+id = "axon-postgres-connection-string"
+description = "Connection string PostgreSQL dengan password tertanam (A-01)"
+regex = '''postgres(?:ql)?:\/\/[^\s:@\/]+:[^\s@\/]{3,}@[^\s\/]+'''
+keywords = ["postgres://", "postgresql://"]
+
+[[rules]]
+id = "axon-db-password-assignment"
+description = "Password database ter-hardcode pada file kode/konfigurasi (A-01)"
+regex = '''(?i)(?:db|database|postgres(?:ql)?|pg)[_-]?(?:pass(?:word)?|pwd)\s*[:=]\s*["']?([^\s"'$\{\}<>]{4,})["']?'''
+keywords = ["password", "passwd", "pwd"]
+  [rules.allowlist]
+  regexes = ['''(?i)(changeme|example|placeholder|your[_-]?password|<.*>)''']
+
+[[rules]]
+id = "axon-laravel-app-key"
+description = "APP_KEY Laravel ter-commit (dipakai untuk enkripsi & signing, A-01/A-06)"
+regex = '''APP_KEY\s*=\s*["']?base64:[A-Za-z0-9+\/=]{40,}["']?'''
+keywords = ["app_key"]
+
+[[rules]]
+id = "axon-sonar-token"
+description = "Token SonarQube ter-hardcode"
+regex = '''(?i)sonar[_-]?token\s*[:=]\s*["']?(sq[apu]_[a-f0-9]{40})["']?'''
+keywords = ["sonar"]
+
+# --- Allowlist global (dijaga seminimal mungkin, setiap entri wajib punya alasan) ---
+[allowlist]
+description = "Global allowlist"
+paths = [
+  '''(^|/)\.env\.example$''',      # template env tanpa nilai asli
+  '''(^|/)policy/gitleaks\.toml$''', # file aturan ini sendiri
+  '''(^|/)docs/.*\.md$''',        # dokumentasi (tetap tidak boleh berisi secret asli)
+]

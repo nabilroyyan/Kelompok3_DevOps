@@ -1,0 +1,23 @@
+# Trivy - Baseline Policy untuk SCA (dependensi) & Container Image
+# Ancaman TM v1: T-11 (supply chain), T-10 (privilege container), aset A-06.
+# Sesuai Issue #5: build FAIL jika ada temuan CRITICAL.
+#
+# Pemakaian:
+#   trivy fs    --config policy/trivy.yaml .                 # SCA dependensi + misconfig
+#   trivy image --config policy/trivy.yaml <nama-image>      # scan image
+
+format: table
+exit-code: 1              # pipeline gagal jika ada temuan yang lolos filter severity
+severity:
+  - CRITICAL              # GATE: blokir. HIGH/MEDIUM dilaporkan di job terpisah (lihat README)
+ignore-unfixed: false     # Critical tanpa patch tetap memblokir; pengecualian lewat .trivyignore
+scanners:
+  - vuln
+  - misconfig             # cek Dockerfile/compose: root user, dsb. (T-10)
+ignorefile: policy/.trivyignore
+timeout: 10m
+# Laravel: dependensi PHP dipindai lewat composer.lock (WAJIB di-commit). Folder runtime dilewati.
+skip-dirs:
+  - storage
+  - bootstrap/cache
+  - node_modules/.cache
