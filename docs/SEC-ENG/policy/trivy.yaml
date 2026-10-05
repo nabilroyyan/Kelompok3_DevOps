@@ -1,23 +1,18 @@
-# Trivy - Baseline Policy untuk SCA (dependensi) & Container Image
-# Ancaman TM v1: T-11 (supply chain), T-10 (privilege container), aset A-06.
-# Sesuai Issue #5: build FAIL jika ada temuan CRITICAL.
+# Trivy — Gate CRITICAL (SCA dan Container). Issue #5: FAIL jika ada Critical.
+# PO 1.2 Risk.md: CVE Critical = ZERO TOLERANCE (0). Build dibatalkan, wajib remedi/patch < 24 jam.
+# Tidak ada pengecualian untuk Critical (file ini sengaja tanpa `ignorefile`).
+# Ancaman TM v1: T-11 (supply chain), T-10 (container). Aset: A-06.
 #
-# Pemakaian:
-#   trivy fs    --config policy/trivy.yaml .                 # SCA dependensi + misconfig
-#   trivy image --config policy/trivy.yaml <nama-image>      # scan image
+# Pemakaian (dari root repo):
+#   trivy fs    --config docs/SEC-ENG/policy/trivy.yaml docs/Dev/axon-devsecops-dss/app
+#   trivy image --config docs/SEC-ENG/policy/trivy.yaml axon-dss-app
+# Gate High (dengan waiver): lihat trivy-high.yaml.
 
 format: table
-exit-code: 1              # pipeline gagal jika ada temuan yang lolos filter severity
+exit-code: 1              # pipeline gagal bila ada temuan CRITICAL
 severity:
-  - CRITICAL              # GATE: blokir. HIGH/MEDIUM dilaporkan di job terpisah (lihat README)
-ignore-unfixed: false     # Critical tanpa patch tetap memblokir; pengecualian lewat .trivyignore
+  - CRITICAL
 scanners:
   - vuln
-  - misconfig             # cek Dockerfile/compose: root user, dsb. (T-10)
-ignorefile: policy/.trivyignore
+ignore-unfixed: false     # Critical tanpa patch tetap memblokir; solusi: ganti base image/versi paket
 timeout: 10m
-# Laravel: dependensi PHP dipindai lewat composer.lock (WAJIB di-commit). Folder runtime dilewati.
-skip-dirs:
-  - storage
-  - bootstrap/cache
-  - node_modules/.cache
