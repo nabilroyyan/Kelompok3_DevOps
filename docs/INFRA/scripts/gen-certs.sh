@@ -11,13 +11,13 @@
 #   Untuk produksi, gunakan CA tepercaya (mis. Let's Encrypt).
 #
 # KEAMANAN
-#   Private key hanya dibuat di docs/Infra/certs/, yang sudah masuk .gitignore.
+#   Private key hanya dibuat di docs/INFRA/certs/, yang sudah masuk .gitignore.
 #   JANGAN pernah meng-commit privkey.pem. Aturan repositori hanya mengizinkan
 #   public key berada di folder `keys/` pada struktur standar.
 #
 # PEMAKAIAN
-#   bash docs/Infra/scripts/gen-certs.sh [hostname-atau-ip]
-#   (tanpa argumen: nama host diambil dari APP_HOST pada docs/Infra/.env)
+#   bash docs/INFRA/scripts/gen-certs.sh [hostname-atau-ip]
+#   (tanpa argumen: nama host diambil dari APP_HOST pada docs/INFRA/.env)
 # =============================================================================
 set -euo pipefail
 

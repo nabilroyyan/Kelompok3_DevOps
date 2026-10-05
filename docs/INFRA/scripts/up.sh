@@ -10,7 +10,7 @@
 #   5. Build image lalu jalankan container.
 #
 # Pemakaian:
-#   bash docs/Infra/scripts/up.sh
+#   bash docs/INFRA/scripts/up.sh
 # =============================================================================
 set -euo pipefail
 
@@ -58,5 +58,5 @@ echo "[up] menjalankan container"
 "${COMPOSE[@]}" up -d
 
 echo "[up] selesai. Langkah berikutnya:"
-echo "     docker compose -f docs/Infra/docker-compose.yml ps"
-echo "     bash docs/Infra/scripts/smoke-test.sh"
+echo "     docker compose -f docs/INFRA/docker-compose.yml ps"
+echo "     bash docs/INFRA/scripts/smoke-test.sh"

@@ -35,7 +35,7 @@ RUN npm run build
 # --- Stage 2: runtime --------------------------------------------------------
 FROM nginx:1.27-alpine
 
-COPY Infra/docker/proxy/nginx.conf /etc/nginx/nginx.conf
+COPY INFRA/docker/proxy/nginx.conf /etc/nginx/nginx.conf
 COPY --from=web /build/dist/ /usr/share/nginx/html/
 
 # Path yang harus bisa ditulis saat nginx berjalan sebagai non-root.

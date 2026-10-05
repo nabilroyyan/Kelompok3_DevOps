@@ -54,7 +54,7 @@ while :; do
 done
 
 if [ -z "${APP_KEY:-}" ]; then
-    echo "[entrypoint] PERINGATAN: APP_KEY kosong. Isi APP_KEY di docs/Infra/.env." >&2
+    echo "[entrypoint] PERINGATAN: APP_KEY kosong. Isi APP_KEY di docs/INFRA/.env." >&2
 fi
 
 exec "$@"
