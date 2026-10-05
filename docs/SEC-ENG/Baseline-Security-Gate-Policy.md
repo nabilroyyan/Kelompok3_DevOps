@@ -1,7 +1,9 @@
 # Baseline Security Gate Policy — DSS Penjualan Axon
 
-**Milestone 1 · [SEC] Define Baseline Security Gate Policies (Issue #5)** · Versi 1.5
-**Stack:** Laravel (backend), React + Vite (frontend), MySQL, Nginx, Docker Compose. **Tools:** Gitleaks, Trivy, Dependabot (semuanya jalan di GitHub tanpa server). Threshold ini adalah baseline dan ditinjau ulang setelah hasil pemindaian pertama.
+**Milestone 1 · [SEC] Define Baseline Security Gate Policies (Issue #5)**<br>
+**Stack:** Laravel (backend), React + Vite (frontend), MySQL, Nginx, Docker Compose.<br>
+**Tools:** Gitleaks, Trivy, Dependabot.<br>
+Threshold ini adalah baseline dan ditinjau ulang setelah hasil pemindaian pertama.
 
 ## 1. Prinsip
 
@@ -13,7 +15,7 @@ Security Gate adalah pemeriksaan otomatis di GitHub Actions yang **memblokir mer
 | :-- | :-- | :-- | :-- |
 | **G1 Secret Scan** | Gitleaks | Ada 1 secret di commit atau riwayat Git. Berjalan di *pre-commit* dan CI. | **0** |
 | **G2 Dependensi (SCA)** | Trivy `fs` | Ada CVE **Critical** (tanpa pengecualian, patch < 24 jam). CVE **High** lebih dari 1, atau tanpa waiver. | Critical **0**, High **maks 1** |
-| **G3 Kebijakan Container** | Skrip pemeriksa | Container berjalan sebagai root. Database memakai `ports`. Password atau `APP_KEY` literal di compose. `APP_DEBUG=true`. Query mentah yang menyambung variabel. | Root **0**, SQLi **0** |
+| **G3 Kebijakan Container** | `policy/scripts/check-infra-policy.sh` | Container berjalan sebagai root. Database memakai `ports`. Password atau `APP_KEY` literal di compose. `APP_DEBUG=true`. Query mentah yang menyambung variabel. | Root **0**, SQLi **0** |
 | **G4 Image Docker** | Trivy `image` | Image `app`, `proxy`, dan `db` memuat CVE Critical, atau High tanpa waiver. | Critical **0**, High **maks 1** |
 
 CVE **Medium/Low** tidak memblokir. Hasilnya dicatat ke backlog mitigasi.
@@ -30,7 +32,7 @@ CVE **Medium/Low** tidak memblokir. Hasilnya dicatat ke backlog mitigasi.
 
 ## 4. Konfigurasi di Folder `/policy`
 
-`gitleaks.toml` · `trivy.yaml` (Critical) · `trivy-high.yaml` dan `.trivyignore` (High + waiver) · `pre-commit-config.yaml` · `dependabot.yml` · `scripts/` (G3) · `pipeline/security-gate.yml` (draf workflow, belum aktif)
+`gitleaks.toml` · `trivy.yaml` (Critical) · `trivy-high.yaml` dan `.trivyignore` (High + waiver) · `pre-commit-config.yaml` · `dependabot.yml` · `scripts/check-infra-policy.sh` (G3) · `pipeline/security-gate.yml` (draf workflow, belum aktif)
 
 ## 5. Prasyarat Sebelum Gate Diaktifkan
 
