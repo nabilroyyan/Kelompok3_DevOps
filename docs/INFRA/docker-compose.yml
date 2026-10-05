@@ -3,12 +3,15 @@
 #
 # RINGKASAN DESAIN
 #   Hanya service `proxy` (Nginx) yang memiliki published port. Service `app`
-#   (php-fpm) dan `db` (MySQL) berada di network `internal` dengan
+#   (php-fpm) dan `db` (MySQL) berada di network `axon-network` dengan
 #   `internal: true`, sehingga keduanya TIDAK dapat dijangkau dari host maupun
 #   dari internet. Ini implementasi langsung dari:
 #     - T-05 (database terekspos)      -> 02-exposure-control.md 2.1
 #     - T-10 (privilege container)     -> semua container non-root
 #     - T-09/T-08 (DoS)                -> limit_req + batas resource
+#
+#   Hak akses user database turut dibatasi menjadi SELECT saja; lihat
+#   docker/db/20-app-user-privileges.sh (arahan PO, least privilege).
 #
 # CARA PAKAI
 #   cp .env.example .env    # lalu isi password & APP_KEY
@@ -44,9 +47,14 @@ services:
       # Tidak ada penyalinan/penulisan balik ke berkas Developer.
       # (Berkas ini adalah dump MySQL; lihat catatan di docs/laporan-infra.md.)
       - ../Dev/axon-devsecops-dss/database/axon-postgresql.sql:/docker-entrypoint-initdb.d/10-classicmodels.sql:ro
+      # Dijalankan SETELAH impor skema (urutan angka 10 lalu 20) untuk mencabut
+      # hak berlebih user aplikasi sehingga tersisa SELECT saja, sesuai
+      # docs/PO/1.1. Architecture.md (Data Tier, least privilege).
+      # Read-only dan tanpa password literal (T-06).
+      - ./docker/db/20-app-user-privileges.sh:/docker-entrypoint-initdb.d/20-app-user-privileges.sh:ro
 
     networks:
-      - internal
+      - axon-network
 
     security_opt:
       - no-new-privileges:true
@@ -123,12 +131,12 @@ services:
       CACHE_STORE: file
       MAIL_MAILER: log
 
-    # Tidak dipublikasikan, hanya dijangkau proxy lewat network internal (TLS-6).
+    # Tidak dipublikasikan, hanya dijangkau proxy lewat network privat (TLS-6).
     expose:
       - "9000"
 
     networks:
-      - internal
+      - axon-network
 
     # T-10 + prinsip least privilege: non-root (USER www-data di Dockerfile),
     # tanpa capability tambahan, dan filesystem root read-only.
@@ -201,11 +209,11 @@ services:
       # Sertifikat TLS development (TLS-5). Read-only dan TIDAK di-commit.
       - ./certs:/etc/nginx/certs:ro
 
-    # `public`  -> dapat diakses dari luar (hanya proxy yang tersambung ke sini)
-    # `internal`-> jalur ke `app`; network ini tidak punya akses keluar
+    # `axon-public`  -> dapat diakses dari luar (hanya proxy yang tersambung)
+    # `axon-network` -> jalur ke `app`; network privat tanpa akses keluar
     networks:
-      - public
-      - internal
+      - axon-public
+      - axon-network
 
     read_only: true
     tmpfs:
@@ -242,11 +250,13 @@ volumes:
 
 networks:
   # Jaringan luar: hanya `proxy` yang tersambung.
-  public:
+  axon-public:
     driver: bridge
   # Jaringan privat antar container aplikasi.
   # `internal: true` = tidak ada rute keluar/masuk dari host maupun internet,
   # sehingga database tidak mungkin diekspos meski konfigurasi app salah (T-05).
-  internal:
+  # Nama `axon-network` mengikuti arahan Product Owner pada
+  # docs/PO/2.1 Developer Analysis Result.md bagian 6.
+  axon-network:
     driver: bridge
     internal: true

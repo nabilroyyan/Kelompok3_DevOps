@@ -7,8 +7,8 @@
 # (TLS-x / EXP-x / T-xx) agar hasilnya bisa langsung dipakai sebagai bukti.
 #
 # Pemakaian:
-#   bash docs/Infra/scripts/smoke-test.sh [https://host] [http://host]
-#   GATE=1 bash docs/Infra/scripts/smoke-test.sh    # + jalankan skrip Security
+#   bash docs/INFRA/scripts/smoke-test.sh [https://host] [http://host]
+#   GATE=1 bash docs/INFRA/scripts/smoke-test.sh    # + jalankan skrip Security
 # =============================================================================
 set -uo pipefail
 
@@ -76,6 +76,14 @@ if grep -qiE '^Server:.*[0-9]+\.[0-9]+' <<<"${hdrs}"; then
 else
     pass "EXP-8 header Server tidak menampilkan versi"
 fi
+# CORS ketat (docs/PO/1.1. Architecture.md, Application Tier): frontend dan API
+# dilayani pada origin yang sama, sehingga CORS tidak diperlukan. Yang diperiksa
+# adalah penegakan deny-by-default: tidak boleh ada wildcard origin.
+if grep -qiE '^Access-Control-Allow-Origin:[[:space:]]*\*' <<<"${hdrs}"; then
+    bad "CORS wildcard (Access-Control-Allow-Origin: *) terkirim; harus deny by default"
+else
+    pass "CORS ketat: tidak ada wildcard Access-Control-Allow-Origin"
+fi
 
 # --- Aplikasi & endpoint ----------------------------------------------------
 echo "-- Frontend & API --"
@@ -91,7 +99,7 @@ if python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("tot
     pass "API mengembalikan data: ${summary}"
 else
     bad "API belum mengembalikan data (respons: ${summary:-kosong})"
-    info "Periksa: docker compose -f docs/Infra/docker-compose.yml logs app db"
+    info "Periksa: docker compose -f docs/INFRA/docker-compose.yml logs app db"
 fi
 
 # --- EXP-1 hanya GET/HEAD, EXP-3 path sensitif ------------------------------
@@ -140,16 +148,42 @@ else
     bad "T-10 container proxy berjalan sebagai root atau tidak dapat diperiksa ('${proxy_user}')"
 fi
 
+# --- Least privilege database (arahan PO) ------------------------------------
+# Kontrol ini menegakkan docs/PO/1.1. Architecture.md (Data Tier): user aplikasi
+# hanya boleh punya SELECT. Diverifikasi dari SHOW GRANTS di dalam kontainer db,
+# bukan dari asumsi konfigurasi.
+echo "-- Least privilege database (PO: SELECT-only) --"
+if [[ -f "${INFRA_DIR}/.env" ]]; then
+    # shellcheck disable=SC1091
+    set -a; . "${INFRA_DIR}/.env"; set +a
+fi
+db_user="${DB_USERNAME:-dss_user}"
+# SQL dikirim sebagai argumen ($1) agar tidak perlu kutip bersarang; ekspansi
+# $MYSQL_ROOT_PASSWORD terjadi di dalam shell kontainer, bukan di host.
+grants="$(docker compose -f "${COMPOSE_FILE}" exec -T db \
+    sh -c 'mysql --protocol=socket -uroot -p"$MYSQL_ROOT_PASSWORD" --silent --skip-column-names -e "$1"' \
+    _ "SHOW GRANTS FOR '${db_user}'@'%';" 2>/dev/null | tr -d '\r' || true)"
+if [[ -z "${grants}" ]]; then
+    bad "Hak akses user '${db_user}' tidak dapat diperiksa (kontainer db belum siap?)"
+elif grep -qiE '\b(ALL PRIVILEGES|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE)\b' <<<"${grants}"; then
+    sed 's/^/      /' <<<"${grants}"
+    bad "Least privilege: user '${db_user}' masih punya hak di luar SELECT"
+elif grep -qi 'SELECT' <<<"${grants}"; then
+    pass "Least privilege: user '${db_user}' hanya memiliki SELECT"
+else
+    bad "Least privilege: tidak menemukan SELECT pada hak akses '${db_user}'"
+fi
+
 # --- Security Gate milik Security Engineer ----------------------------------
 if [[ "${GATE:-0}" == "1" ]]; then
     echo "-- Gate milik Security Engineer --"
     echo "  Gate 4: check-infra-policy.sh"
-    ( cd "$(cd "${INFRA_DIR}/../.." && pwd)" && bash docs/SEC-ENG/policy/scripts/check-infra-policy.sh docs/Infra/docker-compose.yml )
+    ( cd "$(cd "${INFRA_DIR}/../.." && pwd)" && bash docs/SEC-ENG/policy/scripts/check-infra-policy.sh docs/INFRA/docker-compose.yml )
     echo
-    echo "  Verifikasi deployment (evidence disimpan di docs/Infra/evidence/)"
+    echo "  Verifikasi deployment (evidence disimpan di docs/INFRA/evidence/)"
     ( cd "$(cd "${INFRA_DIR}/../.." && pwd)" \
-      && mkdir -p docs/Infra/evidence \
-      && DEV_INSECURE=1 EVIDENCE_DIR=docs/Infra/evidence \
+      && mkdir -p docs/INFRA/evidence \
+      && DEV_INSECURE=1 EVIDENCE_DIR=docs/INFRA/evidence \
          bash docs/SEC-ENG/policy/scripts/verify-deployment.sh "${HTTPS_BASE}" )
 else
     info "Jalankan ulang dengan GATE=1 untuk ikut menjalankan skrip Security Engineer."
