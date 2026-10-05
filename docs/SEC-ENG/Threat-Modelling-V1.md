@@ -1,12 +1,11 @@
-# THREAT MODELING — VERSI 1 (v1)
+# THREAT MODELING — VERSI 1
 
 ## SISTEM PENDUKUNG KEPUTUSAN (DSS) PENJUALAN AXON
 
-**Mata Kuliah:** Workshop DevSecOps — Evaluasi Tengah Semester (UTS)<br>
 **Metodologi:** STRIDE<br>
 **Referensi Acuan:** `docs/PO/1. Project-Overview.md`, `docs/PO/1.2 Risk.md`, `Role.md`, `bab-01.md`, Issue #4 (Milestone 1), `Axon_sales_-_Mysql_Database.sql` (skema `classicmodels`)
 
-> **Catatan Cakupan:** Dokumen ini disusun pada tahap perencanaan (Milestone 1), sebelum implementasi kode dimulai. Analisis difokuskan pada arsitektur dan alur data tingkat tinggi sesuai batasan yang ditetapkan PO. Detail teknis spesifik terkait stack backend/frontend yang dipilih Developer akan didokumentasikan dan dievaluasi ulang pada **Threat Modeling v2** setelah implementasi berjalan.
+> **Catatan Cakupan:** Dokumen ini disusun pada tahap perencanaan (Milestone 1), sebelum implementasi kode dimulai. Analisis difokuskan pada arsitektur dan alur data tingkat tinggi sesuai batasan yang ditetapkan PO.
 
 ---
 
@@ -16,7 +15,7 @@ Threat modeling v1 ini mencakup arsitektur **Dashboard DSS Axon** sebagaimana di
 
 - Aplikasi web dashboard **read-only/analytical**, hanya menampilkan agregasi data dan visualisasi grafik, tanpa fungsi transaksi apa pun.
 - Ter-kontainerisasi penuh (Docker & Docker Compose).
-- Backend berupa **REST API service** yang membaca data dari basis data **PostgreSQL** (skema `classicmodels`, di-porting dari dataset `Axon sales`).
+- Backend berupa **REST API service** yang membaca data dari basis data **MySQL** (skema `classicmodels` dari dataset `Axon sales`).
 - Frontend berupa **Web UI interaktif** yang menampilkan 4 modul keputusan bisnis (Revenue Overview, Order Fulfillment, Inventory Health, Customer Intelligence).
 - **Di luar cakupan (sesuai `Project-Overview.md` 2.1):** transaksi belanja (cart/checkout/payment), CRUD publik atas data penjualan, autentikasi/login, dan penggunaan Power BI.
 
@@ -28,7 +27,7 @@ Karena dashboard bersifat murni tampilan (display-only) tanpa sistem akun, anali
 
 | Kode Aset | Aset | Deskripsi | Tabel/Kolom Terkait (`classicmodels`) | Dampak Bila Terekspos |
 | :--- | :--- | :--- | :--- | :--- |
-| A-01 | Kredensial Database PostgreSQL | Username/password/connection string untuk koneksi backend ↔ database | — (level infrastruktur) | Akses penuh ke seluruh data — pelanggaran kerahasiaan total |
+| A-01 | Kredensial Database MySQL | Username/password/connection string untuk koneksi backend ↔ database | — (level infrastruktur) | Akses penuh ke seluruh data — pelanggaran kerahasiaan total |
 | A-02 | Data Pelanggan Axon | Nama kontak, alamat, telepon, sebaran geografis pelanggan | `customers` (`customerName`, `contactFirstName`, `contactLastName`, `phone`, `addressLine1/2`, `city`, `state`, `country`) | Pelanggaran privasi, risiko reputasi & regulasi |
 | A-03 | Data Finansial/Transaksi | Limit kredit pelanggan, riwayat pembayaran, harga jual/beli produk | `customers.creditLimit`, `payments.amount`, `orderdetails.priceEach`, `products.buyPrice`/`MSRP` | Kebocoran informasi bisnis sensitif; `buyPrice` adalah margin internal |
 | A-04 | Data Operasional Gudang & Order | Status pengiriman/pesanan, level stok produk | `orders.status` (Shipped, In Process, On Hold, Cancelled, Resolved, Disputed), `products.quantityInStock` | Manipulasi dapat menyesatkan keputusan manajemen |
@@ -44,7 +43,7 @@ Karena dashboard bersifat murni tampilan (display-only) tanpa sistem akun, anali
 flowchart LR
     U([👤 Pengguna<br/>Membuka Dashboard]) -->|1: HTTPS Request<br/>Query Filter| WEB[🖥️ Web UI<br/>Dashboard Frontend]
     WEB -->|2: API Call<br/>REST/JSON| API[⚙️ API Backend<br/>REST Service]
-    API -->|3: Parameterized Query| DB[(🗄️ Database<br/>PostgreSQL - classicmodels)]
+    API -->|3: Parameterized Query| DB[(🗄️ Database<br/>MySQL - classicmodels)]
     DB -->|4: Result Set| API
     API -->|5: JSON Response<br/>Data Agregasi| WEB
     WEB -->|6: Render Grafik/KPI| U
@@ -75,7 +74,7 @@ flowchart LR
 | T-02 | **T**ampering              | Query API → Database        | Manipulasi parameter filter (Tahun/Bulan/Kategori) pada request untuk melakukan **SQL Injection**, mengubah/membaca data di luar cakupan yang diizinkan | A-01, A-02, A-03 |     **Kritis**      |
 | T-03 | **T**ampering              | Data in transit (WEB ↔ API) | Modifikasi data agregasi saat transit apabila komunikasi tidak dienkripsi (tanpa TLS)                                                                      | A-05             |       Tinggi        |
 | T-04 | **R**epudiation            | API Backend                 | Tidak adanya log akses membuat tim kesulitan menelusuri sumber trafik mencurigakan atau pola akses abnormal ke data sensitif                                | A-02, A-03       |       Sedang        |
-| T-05 | **I**nformation Disclosure | Database PostgreSQL         | Eksfiltrasi seluruh 8 tabel (termasuk `customers.creditLimit`, `payments`, `employees.email`) akibat database yang salah konfigurasi terekspos ke jaringan publik | A-01, A-02, A-03, A-07 |     **Kritis**      |
+| T-05 | **I**nformation Disclosure | Database MySQL         | Eksfiltrasi seluruh 8 tabel (termasuk `customers.creditLimit`, `payments`, `employees.email`) akibat database yang salah konfigurasi terekspos ke jaringan publik | A-01, A-02, A-03, A-07 |     **Kritis**      |
 | T-06 | **I**nformation Disclosure | Kredensial & Secrets        | Kredensial koneksi database ter-hardcode di source code atau bocor lewat commit Git                                                                        | A-01, A-06       |     **Kritis**      |
 | T-07 | **I**nformation Disclosure | API Backend                 | Pesan error backend yang terlalu detail (stack trace, query SQL) ditampilkan ke client saat terjadi exception                                              | A-01, A-02       |       Sedang        |
 | T-08 | **D**enial of Service      | API Backend / Database      | Query analitik berat (agregasi `orders` + `orderdetails` + `products` lintas tahun) dieksploitasi untuk membebani resource server hingga dashboard tidak dapat diakses | A-05             |       Sedang        |
