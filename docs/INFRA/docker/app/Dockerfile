@@ -16,13 +16,42 @@
 #      -> T-06, T-07 (APP_DEBUG diatur lewat environment, bukan dibekukan
 #      di dalam image).
 #
+# MENGAPA PHP 8.4 (bukan 8.3)
+#   composer.lock mengunci symfony/console v8.1.8 dan 19 paket produksi lain
+#   yang mensyaratkan `php >= 8.4.1`. composer.json tidak menyetel
+#   config.platform, sehingga `composer install` memverifikasi syarat itu
+#   terhadap PHP yang benar-benar dipakai. Di PHP 8.3 build berhenti dengan
+#   "your lock file does not contain a compatible set of packages".
+#   docs/PO/1.1. Architecture.md juga menetapkan "Laravel 13 berbasis PHP 8.4".
+#   Karena itu versi PHP diangkat DAN dipaksa sama antara stage penginstall
+#   (vendor) dan stage runtime.
+#
 # Build context: folder docs/  (lihat docker-compose.yml -> build.context: ..)
 # =============================================================================
 
-# --- Stage 1: pasang dependensi PHP dari composer.lock ------------------------
+# Didefinisikan sekali agar mudah di-bump dan mudah diaudit saat scan image.
+ARG PHP_VERSION=8.4
+
+# --- Stage 1: fondasi runtime (dipakai bersama vendor & image akhir) ---------
+FROM php:${PHP_VERSION}-fpm-alpine AS base
+
+# oniguruma = dependensi runtime mbstring (wajib bagi Laravel: ext-mbstring).
+# Paket build dihapus lagi pada layer yang sama agar tidak menambah CVE.
+RUN apk add --no-cache oniguruma \
+    && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS oniguruma-dev \
+    && docker-php-ext-install -j"$(nproc)" mbstring pdo_mysql opcache \
+    && apk del --no-network .build-deps
+
+# --- Stage 2: pasang dependensi PHP dari composer.lock -----------------------
 # composer.lock di-commit oleh Developer, sehingga versi dependensi bersifat
 # deterministik dan bisa dipindai (SCA) maupun dijadikan bahan SBOM.
-FROM composer:2 AS vendor
+#
+# Hanya BINER composer yang diambil dari image resmi (`--from=composer:2`),
+# bukan PHP-nya. Dengan begitu `composer install` berjalan pada PHP 8.4 yang
+# identik dengan runtime, sehingga syarat platform di composer.lock terbukti
+# saat build, bukan diasumsikan.
+FROM base AS vendor
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 WORKDIR /build
 COPY Dev/axon-devsecops-dss/app/backend/composer.json \
      Dev/axon-devsecops-dss/app/backend/composer.lock ./
@@ -32,21 +61,17 @@ RUN composer install \
         --no-progress \
         --prefer-dist \
         --optimize-autoloader \
-        --no-scripts
+        --no-scripts \
+    # Kontrol gagal-cepat: bila versi PHP atau ekstensi tidak lagi memenuhi
+    # composer.lock, build berhenti di sini dengan pesan yang jelas.
+    && composer check-platform-reqs --no-dev
 
-# --- Stage 2: runtime --------------------------------------------------------
-FROM php:8.3-fpm-alpine
-
-# oniguruma = dependensi runtime mbstring (wajib bagi Laravel: ext-mbstring).
-# Paket build dihapus lagi pada layer yang sama agar tidak menambah CVE.
-RUN apk add --no-cache oniguruma \
-    && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS oniguruma-dev \
-    && docker-php-ext-install -j"$(nproc)" mbstring pdo_mysql opcache \
-    && apk del --no-network .build-deps
+# --- Stage 3: runtime --------------------------------------------------------
+FROM base AS runtime
 
 # Konfigurasi PHP & php-fpm hasil hardening (expose_php=Off, display_errors=Off)
-COPY Infra/docker/app/php.ini /usr/local/etc/php/conf.d/99-axon.ini
-COPY Infra/docker/app/zz-axon-fpm.conf /usr/local/etc/php-fpm.d/zz-axon-fpm.conf
+COPY INFRA/docker/app/php.ini /usr/local/etc/php/conf.d/99-axon.ini
+COPY INFRA/docker/app/zz-axon-fpm.conf /usr/local/etc/php-fpm.d/zz-axon-fpm.conf
 
 WORKDIR /var/www/html
 
@@ -54,7 +79,7 @@ WORKDIR /var/www/html
 COPY Dev/axon-devsecops-dss/app/backend/ /var/www/html/
 COPY --from=vendor /build/vendor/ /var/www/html/vendor/
 
-COPY Infra/docker/app/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY INFRA/docker/app/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 # Direktori runtime dibuat ulang secara eksplisit karena .dockerignore
 # membuang berkas .gitignore di dalamnya, lalu di-own ke www-data.
