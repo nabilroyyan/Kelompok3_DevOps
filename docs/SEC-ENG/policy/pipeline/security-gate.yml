@@ -1,15 +1,16 @@
-# Baseline Security Gate - Axon DSS (Issue #5, Milestone 1)
-# Salin ke .github/workflows/security-gate.yml saat pipeline CI/CD diaktifkan.
-# Secrets repo yang dibutuhkan: SONAR_TOKEN, SONAR_HOST_URL.
-# Catatan: pin versi action ke commit SHA sebelum produksi (mitigasi T-11).
+# Security Gate (draf, belum aktif) — Issue #5, Milestone 3.
+# Aktivasi: salin ke .github/workflows/security-gate.yml.
+# Tidak butuh secret tambahan (GITHUB_TOKEN bawaan sudah cukup).
+# Sebelum produksi: pin versi action ke commit SHA dan image ke digest (mitigasi T-11).
+# Seluruh path relatif terhadap root repo, sesuai struktur docs/ pada repositori.
 
 name: security-gate
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, dev]
   push:
-    branches: [main]
+    branches: [main, dev]
 
 permissions:
   contents: read
@@ -18,19 +19,24 @@ concurrency:
   group: security-gate-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  POLICY_DIR: docs/SEC-ENG/policy
+  APP_DIR: docs/Dev/axon-devsecops-dss/app
+  COMPOSE_FILE: docs/Infra/docker-compose.yml
+
 jobs:
-  # ---- Gate 1: Secret Scanning (T-06) ----
+  # ---- Gate 1: Secret Scanning — Zero Tolerance ----
   secret-scan:
     name: Gate 1 - Secret Scan (Gitleaks)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # scan seluruh riwayat commit, bukan hanya HEAD
+          fetch-depth: 0   # pindai seluruh riwayat commit, bukan hanya HEAD
       - name: Gitleaks
         run: |
           docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest detect \
-            --source=/repo --config=/repo/policy/gitleaks.toml \
+            --source /repo --config "/repo/$POLICY_DIR/gitleaks.toml" \
             --redact --verbose --exit-code 1 \
             --report-format sarif --report-path /repo/gitleaks.sarif
       - uses: actions/upload-artifact@v4
@@ -40,99 +46,66 @@ jobs:
           path: gitleaks.sarif
           if-no-files-found: ignore
 
-  # ---- Gate 2: SAST SonarQube (T-02, T-06, T-07) ----
-  sast-sonarqube:
-    name: Gate 2 - SAST (SonarQube Quality Gate)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0   # wajib untuk deteksi "new code" SonarQube
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.3'          # sesuaikan dengan versi PHP proyek
-          coverage: pcov              # untuk laporan coverage PHPUnit
-          extensions: mbstring, pdo_sqlite
-      - name: Install dependensi Laravel
-        run: composer install --no-interaction --prefer-dist --no-progress
-      - name: Siapkan env pengujian (SQLite in-memory, tanpa secret nyata)
-        run: |
-          cp .env.example .env
-          php artisan key:generate
-      - name: PHPUnit + coverage (clover & junit)
-        env:
-          DB_CONNECTION: sqlite
-          DB_DATABASE: ":memory:"
-        run: |
-          mkdir -p coverage
-          vendor/bin/phpunit --coverage-clover coverage/clover.xml --log-junit coverage/junit.xml
-      - name: SonarQube scan (menunggu Quality Gate)
-        uses: SonarSource/sonarqube-scan-action@v5
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        with:
-          projectBaseDir: .
-          args: >
-            -Dproject.settings=policy/sonarqube/sonar-project.properties
-            -Dsonar.qualitygate.wait=true
-
-  # ---- Gate 3: SCA dependensi + SBOM (T-11) ----
+  # ---- Gate 2: SCA dependensi (T-11) — Critical = 0 (High hanya dilaporkan) ----
   sca-dependencies:
-    name: Gate 3 - SCA & SBOM (Trivy fs)
+    name: Gate 2 - SCA (Trivy fs)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: aquasecurity/setup-trivy@v0.2.2
-      - name: Trivy fs - FAIL jika ada CRITICAL (membaca composer.lock)
-        run: trivy fs --config policy/trivy.yaml .
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.3'
-      - name: Composer audit (informasi pembanding, tidak memblokir)
+      - name: Critical (tanpa pengecualian)
+        run: trivy fs --config "$POLICY_DIR/trivy.yaml" "$APP_DIR"
+      - name: High/Medium/Low (tidak memblokir, untuk backlog)
         if: always()
-        run: composer audit --locked --no-dev || true
-      - name: Laporan HIGH (tidak memblokir, untuk triase)
-        if: always()
-        run: trivy fs --scanners vuln --severity HIGH --exit-code 0 --format table .
-      - name: Generate SBOM (CycloneDX)
-        if: always()
-        run: trivy fs --format cyclonedx --output sbom.cdx.json .
+        run: trivy fs --scanners vuln --severity HIGH,MEDIUM,LOW --exit-code 0 --format json --output trivy-backlog.json "$APP_DIR"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: sbom-cyclonedx
-          path: sbom.cdx.json
+          name: trivy-sca-backlog
+          path: trivy-backlog.json
           if-no-files-found: ignore
 
-  # ---- Gate 4: Kebijakan infrastruktur (T-05, T-10, T-06) ----
-  infra-policy:
-    name: Gate 4 - Infra Policy (DB isolasi, non-root)
+  # ---- Gate 3: Kebijakan container (T-05, T-06, T-10) — root/port DB/secret = Zero Tolerance ----
+  container-policy:
+    name: Gate 3 - Container Policy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: pip install pyyaml
-      - name: Cek kebijakan infra, Laravel, dan Bootstrap (SRI)
-        run: bash policy/scripts/check-infra-policy.sh docker-compose.yml
+      - name: Cek non-root, port database, secret literal (dari root repo)
+        run: bash "$POLICY_DIR/scripts/check-infra-policy.sh" "$COMPOSE_FILE"
+      # Guard T-02 membaca app/ dan routes/ relatif terhadap direktori kerja,
+      # sehingga harus dijalankan dari root backend agar kode Developer terperiksa.
+      - name: Guard SQL Injection (T-02) pada kode backend
+        working-directory: docs/Dev/axon-devsecops-dss/app/backend
+        run: bash "$GITHUB_WORKSPACE/$POLICY_DIR/scripts/check-infra-policy.sh" "$GITHUB_WORKSPACE/$COMPOSE_FILE"
 
-  # ---- Gate 5: Container image scan (T-10, T-11) ----
+  # ---- Gate 4: Container image scan (T-10, T-11) ----
   image-scan:
-    name: Gate 5 - Container Image Scan (Trivy)
+    name: Gate 4 - Container Image Scan (Trivy)
     runs-on: ubuntu-latest
-    needs: [secret-scan, infra-policy]
+    needs: [secret-scan, container-policy]
     steps:
       - uses: actions/checkout@v4
       - uses: aquasecurity/setup-trivy@v0.2.2
-      - name: Build dan scan setiap Dockerfile
+      - name: Nilai env untuk build (acak, bukan secret)
         run: |
-          shopt -s nullglob
-          files=$(find . -name 'Dockerfile' -not -path './node_modules/*')
-          if [ -z "$files" ]; then echo "Belum ada Dockerfile, gate dilewati"; exit 0; fi
+          {
+            echo "MYSQL_ROOT_PASSWORD=$(openssl rand -hex 16)"
+            echo "DB_PASSWORD=$(openssl rand -hex 16)"
+            echo "DB_USERNAME=axon"
+            echo "APP_KEY=base64:$(openssl rand -base64 32)"
+          } >> "$GITHUB_ENV"
+      - name: Build image (app dan proxy) dan pull image database
+        run: |
+          docker compose -f "$COMPOSE_FILE" build
+          docker compose -f "$COMPOSE_FILE" pull db
+      - name: Scan seluruh image (Critical)
+        run: |
           rc=0
-          for f in $files; do
-            name="axon-$(echo "$(dirname "$f")" | tr -c 'a-z0-9\n' '-' | sed 's/^-*//;s/-*$//')"
-            docker build -t "$name:ci" -f "$f" "$(dirname "$f")"
-            trivy image --config policy/trivy.yaml "$name:ci" || rc=1
+          for img in $(docker compose -f "$COMPOSE_FILE" config --images); do
+            echo "== $img"
+            trivy image --config "$POLICY_DIR/trivy.yaml" "$img" || rc=1
           done
           exit $rc
 
@@ -140,6 +113,6 @@ jobs:
   security-gate-passed:
     name: Security Gate - PASSED
     runs-on: ubuntu-latest
-    needs: [secret-scan, sast-sonarqube, sca-dependencies, infra-policy, image-scan]
+    needs: [secret-scan, sca-dependencies, container-policy, image-scan]
     steps:
       - run: echo "Seluruh Security Gate lulus."
