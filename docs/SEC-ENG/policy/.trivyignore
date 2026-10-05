@@ -1,7 +1,0 @@
-# Daftar pengecualian temuan Trivy (kosong pada baseline).
-# Aturan: setiap entri WAJIB berisi alasan, pemilik, dan tanggal kedaluwarsa, lalu disetujui PO/Security.
-# Format Trivy:  <ID-CVE> exp:YYYY-MM-DD   (dengan komentar di baris atas)
-#
-# Contoh (jangan diaktifkan tanpa persetujuan):
-# # Alasan: tidak exploitable, library hanya dipakai di build-time. Pemilik: @user. Disetujui: PO
-# CVE-2099-00000 exp:2026-12-31
