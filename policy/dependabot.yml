@@ -4,16 +4,16 @@
 version: 2
 updates:
   - package-ecosystem: composer
-    directory: /docs/Dev/axon-devsecops-dss/app/backend
+    directory: /app/backend
     schedule: { interval: weekly }
   - package-ecosystem: npm
-    directory: /docs/Dev/axon-devsecops-dss/app/frontend
+    directory: /app/frontend
     schedule: { interval: weekly }
   - package-ecosystem: docker
-    directory: /docs/Infra/docker/app
+    directory: /docker/app
     schedule: { interval: weekly }
   - package-ecosystem: docker
-    directory: /docs/Infra/docker/proxy
+    directory: /docker/proxy
     schedule: { interval: weekly }
   - package-ecosystem: github-actions
     directory: /

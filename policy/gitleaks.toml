@@ -3,7 +3,7 @@
 # Ancaman TM v1: T-06 (kredensial/APP_KEY/private key bocor). Aset: A-01, A-06.
 #
 # Pemakaian (dari root repo):
-#   gitleaks detect --source . --config docs/SEC-ENG/policy/gitleaks.toml --redact --verbose
+#   gitleaks detect --source . --config policy/gitleaks.toml --redact --verbose
 # Pre-commit: lihat policy/pre-commit-config.yaml. CI: policy/pipeline/security-gate.yml.
 # Alternatif/pemindai kedua (opsional): trufflehog git file://. --only-verified --fail
 
@@ -42,7 +42,13 @@ keywords = ["app_key"]
 description = "Global allowlist"
 paths = [
   '''(^|/)\.env\.example$''',            # template env tanpa nilai asli
-  '''(^|/)docs/SEC-ENG/policy/gitleaks\.toml$''', # berkas aturan ini sendiri
+  '''(^|/)policy/gitleaks\.toml$''', # berkas aturan ini sendiri
   '''(^|/)composer\.lock$''',            # hash integritas paket, bukan secret
   '''(^|/)package-lock\.json$''',        # hash integritas paket, bukan secret
+  # False positive rule bawaan `curl-auth-user`: berkas historis ini (commit
+  # 16a44ae, sudah dihapus pada 3c60477) memakai `curl -u "${SONAR_TOKEN}:"`
+  # — referensi variabel environment, bukan token literal. Gate memindai
+  # seluruh riwayat (fetch-depth: 0), sehingga tanpa entri ini Gate 1 merah
+  # permanen walau berkasnya sudah tidak ada di tree.
+  '''(^|/)docs/SEC-ENG/policy/sonarqube/setup-quality-gate\.sh$''',
 ]

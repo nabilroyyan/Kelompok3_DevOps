@@ -4,8 +4,8 @@
 # Ancaman TM v1: T-11 (supply chain), T-10 (container). Aset: A-06.
 #
 # Pemakaian (dari root repo):
-#   trivy fs    --config docs/SEC-ENG/policy/trivy.yaml docs/Dev/axon-devsecops-dss/app
-#   trivy image --config docs/SEC-ENG/policy/trivy.yaml axon-dss-app
+#   trivy fs    --config policy/trivy.yaml app
+#   trivy image --config policy/trivy.yaml axon-dss-app
 
 format: table
 exit-code: 1              # pipeline gagal bila ada temuan CRITICAL

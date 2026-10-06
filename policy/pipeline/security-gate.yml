@@ -2,7 +2,7 @@
 # Aktivasi: salin ke .github/workflows/security-gate.yml.
 # Tidak butuh secret tambahan (GITHUB_TOKEN bawaan sudah cukup).
 # Sebelum produksi: pin versi action ke commit SHA dan image ke digest (mitigasi T-11).
-# Seluruh path relatif terhadap root repo, sesuai struktur docs/ pada repositori.
+# Seluruh path relatif terhadap root repo, sesuai struktur root repositori.
 
 name: security-gate
 
@@ -20,9 +20,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  POLICY_DIR: docs/SEC-ENG/policy
-  APP_DIR: docs/Dev/axon-devsecops-dss/app
-  COMPOSE_FILE: docs/INFRA/docker-compose.yml
+  POLICY_DIR: policy
+  APP_DIR: app
+  COMPOSE_FILE: docker-compose.yml
 
 jobs:
   # ---- Gate 1: Secret Scanning — Zero Tolerance ----
@@ -77,7 +77,7 @@ jobs:
       # Guard T-02 membaca app/ dan routes/ relatif terhadap direktori kerja,
       # sehingga harus dijalankan dari root backend agar kode Developer terperiksa.
       - name: Guard SQL Injection (T-02) pada kode backend
-        working-directory: docs/Dev/axon-devsecops-dss/app/backend
+        working-directory: app/backend
         run: bash "$GITHUB_WORKSPACE/$POLICY_DIR/scripts/check-infra-policy.sh" "$GITHUB_WORKSPACE/$COMPOSE_FILE"
 
   # ---- Gate 4: Container image scan (T-10, T-11) ----
