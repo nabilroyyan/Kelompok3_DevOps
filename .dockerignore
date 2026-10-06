@@ -1,8 +1,8 @@
 # ============================================================================
-# Build context untuk Dockerfile di docs/INFRA/docker/*
+# Build context untuk Dockerfile di docker/app dan docker/proxy
 #
-# docker-compose.yml berada di docs/INFRA/, sehingga build context diarahkan ke
-# folder induknya (`docs/`). Berkas ini harus berada tepat di root context.
+# docker-compose.yml berada di root repositori (build.context: .), sehingga
+# berkas ini harus berada tepat di root context.
 #
 # Tujuan: agar konteks build tidak membawa vendor/, node_modules/, sertifikat,
 # dan dokumen yang tidak dibutuhkan image (memperkecil context + menghindari
@@ -14,24 +14,32 @@
 **/.gitignore
 
 # Rahasia & sertifikat
-INFRA/.env
-INFRA/.env.*
-INFRA/certs
-INFRA/evidence
-INFRA/logs
-
-# Dokumen yang tidak dipakai image
-PO
-SEC-ENG
+.env
+.env.*
+!.env.example
+certs
+evidence
+logs
 
 # Dependensi & artefak build (dipasang ulang di dalam image)
-Dev/axon-devsecops-dss/app/backend/vendor
-Dev/axon-devsecops-dss/app/backend/node_modules
-Dev/axon-devsecops-dss/app/backend/.env
-Dev/axon-devsecops-dss/app/frontend/node_modules
-Dev/axon-devsecops-dss/app/frontend/dist
+app/backend/vendor
+app/backend/node_modules
+app/backend/.env
+app/frontend/node_modules
+app/frontend/dist
 
 # Berkas kerja Developer yang tidak diperlukan runtime
-Dev/axon-devsecops-dss/app/backend/AGENTS.md
-Dev/axon-devsecops-dss/app/backend/CLAUDE.md
-Dev/axon-devsecops-dss/app/backend/fixed-postgres.sql
+app/backend/AGENTS.md
+app/backend/CLAUDE.md
+app/backend/fixed-postgres.sql
+
+# Dokumen & konfigurasi yang tidak dipakai image
+policy
+reports
+sbom
+keys
+database
+docker/docs
+.github
+README.md
+LICENSE
