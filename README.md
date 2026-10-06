@@ -1,11 +1,6 @@
 # Kelompok 3 — DevOps
 
-Selamat datang di repositori **Kelompok 3** untuk mata kuliah/topik **DevOps**.
-Repositori ini digunakan sebagai wadah kolaborasi seluruh anggota kelompok dalam mengerjakan tugas, proyek, dan praktikum.
-
----
-
-## 👥 Anggota Kelompok
+## Anggota Kelompok
 
 | No | Nama | NIM | Peran |
 | :-: | :--- | :--- | :--- |
@@ -14,39 +9,9 @@ Repositori ini digunakan sebagai wadah kolaborasi seluruh anggota kelompok dalam
 | 3 | Anifa Aulia Abdari | 3126640053 | **Security Engineer** |
 | 4 | Ale Perdana Putra Darmawan | 3126640016 | **Infrastructure Engineer** |
 
----
+## Teknologi yang digunakan
 
-## 🧩 Pembagian Peran & Tanggung Jawab
-
-### 1. Product Owner — Adam Rasyid Nurmuhammad (3126640025)
-- Menentukan visi, tujuan, dan prioritas proyek.
-- Mengelola serta menyusun *product backlog*.
-- Menjembatani kebutuhan pengguna dengan tim teknis.
-- Memastikan hasil pekerjaan sesuai kebutuhan dan diterima (*acceptance*).
-
-### 2. Developer — Muhammad Nabil Royyan (3126640032)
-- Menulis dan memelihara kode aplikasi.
-- Melakukan *code review* serta mengikuti standar gaya penulisan kode.
-- Menjaga kualitas melalui pengujian dan perbaikan bug.
-- Berkolaborasi dalam pengembangan fitur secara iteratif.
-
-### 3. Security Engineer — Anifa Aulia Abdari (3126640053)
-- Menerapkan praktik *secure coding* dan manajemen rahasia (*secrets*).
-- Mengelola keamanan pipeline CI/CD serta hak akses.
-- Melakukan pemeriksaan kerentanan dependensi dan konfigurasi.
-- Menyusun kebijakan keamanan dan mitigasi risiko.
-
-### 4. Infrastructure Engineer — Ale Perdana Putra Darmawan (3126640016)
-- Menyiapkan dan memelihara infrastruktur serta lingkungan deployment.
-- Membangun dan mengelola pipeline CI/CD.
-- Melakukan otomatisasi konfigurasi dan *monitoring*.
-- Menjaga ketersediaan, skalabilitas, dan keandalan sistem.
-
----
-
-## 🛠️ Rencana Teknologi
-
-| Kategori | Alat/Teknologi |
+| Kategori | Teknologi |
 | :--- | :--- |
 | Version Control | Git, GitHub |
 | CI/CD | GitHub Actions |
@@ -54,52 +19,44 @@ Repositori ini digunakan sebagai wadah kolaborasi seluruh anggota kelompok dalam
 | Cloud/Server | VPS / Cloud Provider |
 
 ---
-## 📁 Struktur Repositori (Rencana)
-
-Repositori ini menerapkan tata kelola berbasis peran (*Role-Based Workspace*) untuk mendukung kolaborasi tim DevSecOps serta integrasi pipeline otomatis:
+## Struktur Repositori
 
 ```text
 Kelompok3_DevOps/
-├── .github/
-│   └── workflows/              
-├── docs/                       
-│   ├── PO/                     
-│   │   ├── 1. Project-Overview.md            
-│   │   ├── 1.1. Architecture.md              
-│   │   ├── 1.2 Risk.md                       
-│   │   ├── 1.3. Task-Role.md                 
-│   │   ├── 1.4. Milestone.md                 
-│   │   └── 2.1 Developer Analysis Result.md  
-│   ├── DEV/                    
-│   │   └── axon-devsecops-dss/
-│   │       ├── app/
-│   │       │   ├── backend/    
-│   │       │   └── frontend/   
-│   │       ├── database/       
-│   │       ├── sbom/           
-│   ├── SEC-ENG/                
-│   │   ├── Threat-Modelling-V1.md           
-│   │   ├── policy/             
-│   │   └── reports/            
-│   └── INFRA/                  
-│       ├── docker/             
-│       ├── docker-compose.yml  
-│       ├── certs/             
-│       ├── scripts/           
-│       └── README.md           
-├── references/                
-├── LICENSE                     
-└── README.md                   
+├── .github/                    # Konfigurasi otomasi CI/CD & Dependabot
+│   ├── workflows/              # Pipeline GitHub Security Gates, SAST,SCA
+│   └── dependabot.yml          # Konfigurasi update otomatis dependensi
+├── app/                        
+│   ├── backend/               
+│   ├── frontend/               
+│   └── README.md               
+├── database/                   
+│   ├── axon-postgresql.sql     
+│   └── README.md               
+├── keys/                       
+│   └── README.md               
+├── policy/                     
+│   ├── gitleaks.toml           
+│   ├── trivy.yaml              
+│   ├── dependabot.yml          
+│   ├── pipeline/               
+│   └── scripts/                
+├── reports/                    # Laporan keamanan (SAST, SCA, Container)
+│   └── README.md               # Dokumentasi dan ringkasan audit keamanan
+├── sbom/                       # CycloneDX / SPDX
+│   └── README.md               # Dokumentasi spesifikasi SBOM
+├── .dockerignore               
+├── .gitignore                 
+├── LICENSE                    
+└── README.md                   # Dokumentasi utama repositori proyek
 ```
 
 
 
 
-## 🛡️ Status Implementasi DevSecOps
+## [DELETE SOON] Status Implementasi DevSecOps
 
-Evaluasi kesiapan sistem terhadap integrasi praktik **DevSecOps**, keamanan kode, dan arsitektur kontainer berdasarkan tanggung jawab 4 peran:
-
-### 1. Ringkasan Status Proyek (Scorecard)
+### 1. Ringkasan Status Proyek
 - **Fase Saat Ini:** Transisi dari **Milestone 2 (Secure Development)** menuju **Milestone 3 (Containerization & Security Scanning)**.
 - **Tingkat Kesiapan (Readiness):** **~75%** (Aplikasi, kebijakan keamanan, dan konfigurasi Docker sudah siap; integrasi pipeline otomatis dan pengujian live scan sedang berjalan).
 
@@ -107,7 +64,7 @@ Evaluasi kesiapan sistem terhadap integrasi praktik **DevSecOps**, keamanan kode
 | :--- | :---: | :--- |
 | **Secure Coding & Anti-SQLi** | 🟢 **Selesai** | Parameterized query (Laravel Query Builder), 100% read-only API. |
 | **Secrets Management** | 🟢 **Selesai** | `.env` terisolasi dari Git, konfigurasi `gitleaks.toml` tersedia. |
-| **Threat Modeling (v1)** | 🟢 **Selesai** | Analisis STRIDE & PASTA terdokumentasi di `docs/SEC-ENG/Threat-Modelling-V1.md`. |
+| **Threat Modeling (v1)** | 🟢 **Selesai** | Analisis STRIDE & PASTA terdokumentasi di `policy/pipeline/security-gate.yml`. |
 | **Security Policy as Code** | 🟢 **Selesai** | Aturan Trivy, Gitleaks, dan SonarQube Quality Gate siap pakai. |
 | **Container Hardening Specs** | 🟢 **Selesai** | Dockerfile PHP-FPM & Nginx proxy (non-root) dan `docker-compose.yml` siap di `docs/INFRA`. |
 | **Software Bill of Materials (SBOM)**| 🔴 **Belum** | Artefak CycloneDX / SPDX di folder `/sbom` belum di-generate. |
@@ -116,7 +73,7 @@ Evaluasi kesiapan sistem terhadap integrasi praktik **DevSecOps**, keamanan kode
 
 ---
 
-### 2. Apa yang SUDAH Diimplementasikan (Accomplished)
+### 2. [DELETE SOON] Apa yang SUDAH Diimplementasikan 
 
 #### A. Product Owner (PO)
 - [x] Menyusun dokumen visi, tata kelola, dan batasan ketat DSS di [1. Project-Overview.md](docs/PO/1.%20Project-Overview.md).
@@ -136,7 +93,7 @@ Evaluasi kesiapan sistem terhadap integrasi praktik **DevSecOps**, keamanan kode
 - [x] Menyediakan skrip launcher pengujian lokal (`run-all.bat`, `run-backend.bat`, `run-frontend.bat`).
 
 #### C. Security Engineer (SEC-ENG)
-- [x] Menyusun dokumen **Threat Modeling v1** ([docs/SEC-ENG/Threat-Modelling-V1.md](docs/SEC-ENG/Threat-Modelling-V1.md)) menggunakan framework STRIDE dan PASTA.
+- [x] Menyusun dokumen **Threat Modeling v1** ([policy/pipeline/security-gate.yml](policy/pipeline/security-gate.yml)) menggunakan framework STRIDE dan PASTA.
 - [x] Menetapkan aturan pemindaian kebocoran rahasia (*Secret Scanning*) via `policy/gitleaks.toml`.
 - [x] Menetapkan aturan pemindaian kerentanan kontainer & dependensi via `policy/trivy.yaml` dan `.trivyignore`.
 - [x] Menetapkan aturan kualitas kode (*SAST*) via `policy/sonarqube/sonar-project.properties` dan `setup-quality-gate.sh`.
@@ -144,15 +101,15 @@ Evaluasi kesiapan sistem terhadap integrasi praktik **DevSecOps**, keamanan kode
 - [x] Merancang skrip pengujian kepatuhan infrastruktur (`policy/scripts/check-infra-policy.sh`).
 
 #### D. Infrastructure Engineer (INFRA)
-- [x] Menyusun orkestrasi multi-kontainer melalui [docs/INFRA/docker-compose.yml](docs/INFRA/docker-compose.yml).
+- [x] Menyusun orkestrasi multi-kontainer melalui `docker-compose.yml`.
 - [x] Mengonfigurasi `Dockerfile` backend PHP-FPM dengan prinsip *least privilege* (user non-root `www-data`, ekstensi PDO terisolasi).
 - [x] Mengonfigurasi `Dockerfile` reverse proxy Nginx beserta template pengerasan konfigurasi (`nginx.conf`).
 - [x] Menyusun skrip otomatisasi sertifikat TLS mandiri (`scripts/gen-certs.sh`) dan pengujian kesehatan (`scripts/smoke-test.sh`).
-- [x] Menyusun dokumentasi infrastruktur dan panduan kontainer di `docs/INFRA/README.md`.
+- [x] Menyusun dokumentasi infrastruktur dan panduan kontainer di `README.md`.
 
 ---
 
-### 3. Apa yang BELUM Diimplementasikan (Backlog / Action Items)
+### 3. [DELETE SOON] Apa yang BELUM Diimplementasikan (Backlog / Action Items)
 
 Berikut adalah daftar pekerjaan yang perlu diselesaikan menuju **Milestone 3** dan **Milestone 4 (Final UTS)**:
 
@@ -161,7 +118,7 @@ Berikut adalah daftar pekerjaan yang perlu diselesaikan menuju **Milestone 3** d
 2. **Generasi Dokumen SBOM (`/sbom`):**
    - Developer perlu meng-generate dokumen SBOM berstandar CycloneDX JSON (`backend-sbom.cdx.json` dan `frontend-sbom.cdx.json`) dan meletakkannya di folder `/sbom`.
 3. **Penyimpanan Artefak Hasil Audit Pemindaian (`/reports`):**
-   - Menjalankan pemindaian nyata (Gitleaks, Trivy, Semgrep/SonarQube) dan mendokumentasikan log/laporan resmi (format SARIF/JSON/PDF) ke folder `docs/SEC-ENG/reports/`.
+   - Menjalankan pemindaian nyata (Gitleaks, Trivy, Semgrep/SonarQube) dan mendokumentasikan log/laporan resmi (format SARIF/JSON/PDF) ke folder `reports/`.
 4. **Uji Coba Integrasi Kontainer Runtime (Docker Run & Test):**
    - Menjalankan dan memvalidasi `docker-compose.yml` di environment lokal/VPS untuk memastikan kontainer frontend, backend, dan database MySQL terhubung lancar di jaringan privat `axon-network`.
 5. **Penyempurnaan Modul Bisnis DSS:**
@@ -170,9 +127,7 @@ Berikut adalah daftar pekerjaan yang perlu diselesaikan menuju **Milestone 3** d
    - Menyusun dokumen `Threat-Modelling-V2.md` yang mencatat evaluasi risiko pasca-mitigasi dan kesiapan deployment final.
 
 ---
-## 🚀 Panduan Menjalankan Projek (Axon DSS)
-
-Ikuti langkah-langkah berikut secara berurutan untuk menjalankan database, backend, dan frontend di lingkungan lokal:
+## Cara menjalankan Projek Axon DSS
 
 ### 1. Prasyarat Sistem
 Pastikan perangkat Anda telah terpasang:
@@ -183,12 +138,11 @@ Pastikan perangkat Anda telah terpasang:
 
 ---
 
-### 2. Langkah 1: Menyiapkan & Menjalankan Database (MySQL)
+### Langkah 1: Menyiapkan & Menjalankan Database (MySQL)
 
 1. Pastikan layanan MySQL sedang berjalan (misalnya melalui XAMPP Control Panel klik **Start** pada modul MySQL).
 2. Buka terminal, masuk ke direktori repository, lalu impor skema database `classicmodels`:
    ```bash
-   cd "docs/DEV/axon-devsecops-dss"
    mysql -u root -p < database/axon-postgresql.sql
    ```
    *(Tekan Enter jika akun root lokal Anda tidak menggunakan password).*
@@ -199,11 +153,11 @@ Pastikan perangkat Anda telah terpasang:
 
 ---
 
-### 3. Langkah 2: Menjalankan Backend (Laravel API)
+### Langkah 2: Menjalankan Backend (Laravel API)
 
 1. Buka **Terminal 1**, lalu masuk ke direktori backend:
    ```bash
-   cd "docs/DEV/axon-devsecops-dss/app/backend"
+   cd app/backend
    ```
 2. Pasang dependensi PHP (jika baru pertama kali):
    ```bash
@@ -239,11 +193,11 @@ Pastikan perangkat Anda telah terpasang:
 
 ---
 
-### 4. Langkah 3: Menjalankan Frontend (React + Vite)
+### Langkah 3: Menjalankan Frontend (React + Vite)
 
 1. Buka **Terminal 2**, lalu masuk ke direktori frontend:
    ```bash
-   cd "docs/DEV/axon-devsecops-dss/app/frontend"
+   cd app/frontend
    ```
 2. Pasang dependensi JavaScript (jika baru pertama kali):
    ```bash
@@ -261,10 +215,10 @@ Pastikan perangkat Anda telah terpasang:
 
 ---
 
-### 5. Mengakses Dashboard
+### Mengakses Dashboard
 
-Buka peramban web (browser) Anda dan akses alamat:
-👉 **[http://127.0.0.1:5173](http://127.0.0.1:5173)**
+Buka browser Anda dan akses alamat:
+**[http://localhost:5173](http://localhost:5173)**
 
 Aplikasi secara otomatis mengarahkan ke halaman `/overview` dan menampilkan agregasi data analitik secara interaktif dari database MySQL.
 
@@ -274,11 +228,3 @@ Aplikasi secara otomatis mengarahkan ke halaman `/overview` dan menampilkan agre
 ## 📄 Lisensi
 
 Proyek ini dilisensikan sesuai berkas [LICENSE](LICENSE).
-
----
-
-<div align="center">
-
-**Kelompok 3 — DevOps &copy; 2026**
-
-</div>
