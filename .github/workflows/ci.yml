@@ -89,7 +89,7 @@ jobs:
       security-events: write # untuk mengunggah SARIF ke tab Security
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # pindai seluruh riwayat commit, bukan hanya HEAD
 
@@ -107,14 +107,14 @@ jobs:
       - name: Unggah SARIF ke tab Security
         if: always()
         continue-on-error: true
-        uses: github/codeql-action/upload-sarif@1190a975f95ce23525efb6a3fc21ea29567c1b52 # v3
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           sarif_file: gitleaks.sarif
           category: gitleaks
 
       - name: Simpan laporan sebagai artefak
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: gitleaks-sarif
           path: gitleaks.sarif
@@ -132,7 +132,7 @@ jobs:
       security-events: write
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # wajib agar SonarCloud dapat menghitung "new code"
 
@@ -180,7 +180,7 @@ jobs:
 
       - name: SonarCloud scan
         if: env.SONAR_READY == 'true'
-        uses: SonarSource/sonarqube-scan-action@2f77a1ec69fb1d595b06f35ab27e97605bdef703 # v5
+        uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
@@ -195,7 +195,7 @@ jobs:
 
       - name: Simpan laporan SonarCloud
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sonar-report
           path: |
@@ -211,7 +211,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # --config + --ignorefile eksplisit (catatan #3). Config milik Security
       # sudah menyetel severity CRITICAL, exit-code 1, dan scanners vuln+misconfig.
@@ -245,7 +245,7 @@ jobs:
       - name: Unggah SARIF SCA ke tab Security
         if: always()
         continue-on-error: true
-        uses: github/codeql-action/upload-sarif@1190a975f95ce23525efb6a3fc21ea29567c1b52 # v3
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           sarif_file: trivy-fs.sarif
           category: trivy-fs
@@ -257,7 +257,7 @@ jobs:
 
       - name: Simpan SBOM sebagai artefak
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sbom-cyclonedx
           path: ${{ runner.temp }}/sbom/
@@ -271,7 +271,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Pasang PyYAML (dibutuhkan check-infra-policy.sh)
         run: pip install pyyaml
@@ -319,7 +319,7 @@ jobs:
     needs: [secret-scan, infra-policy]
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Siapkan .env CI (nilai dummy, bukan rahasia)
         run: cp docs/INFRA/.env.example docs/INFRA/.env
