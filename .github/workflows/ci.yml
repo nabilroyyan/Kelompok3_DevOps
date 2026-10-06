@@ -98,7 +98,7 @@ jobs:
       security-events: write # untuk mengunggah SARIF ke tab Security
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0 # pindai seluruh riwayat commit, bukan hanya HEAD
 
@@ -116,14 +116,14 @@ jobs:
       - name: Unggah SARIF ke tab Security
         if: always()
         continue-on-error: true
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: gitleaks.sarif
           category: gitleaks
 
       - name: Simpan laporan sebagai artefak
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: gitleaks-sarif
           path: gitleaks.sarif
@@ -138,7 +138,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # --config eksplisit (catatan #3). Config milik Security sudah menyetel
       # severity CRITICAL, exit-code 1, dan scanner vuln.
@@ -172,7 +172,7 @@ jobs:
       - name: Unggah SARIF SCA ke tab Security
         if: always()
         continue-on-error: true
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-fs.sarif
           category: trivy-fs
@@ -184,7 +184,7 @@ jobs:
 
       - name: Simpan SBOM sebagai artefak
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sbom-cyclonedx
           path: ${{ runner.temp }}/sbom/
@@ -199,7 +199,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Pasang PyYAML (dibutuhkan check-infra-policy.sh)
         run: pip install pyyaml
@@ -250,7 +250,7 @@ jobs:
     needs: [secret-scan, infra-policy]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Siapkan .env CI (nilai dummy, bukan rahasia)
         run: |
@@ -341,7 +341,7 @@ jobs:
       security-events: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Ruleset mengikuti pilihan Security Engineer pada template
       # policy/pipeline/security-gate.yml (p/php, p/javascript, p/owasp-top-ten).
@@ -367,14 +367,14 @@ jobs:
 
       - name: Unggah SARIF ke tab Security
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: reports/semgrep.sarif
           category: semgrep
 
       - name: Simpan laporan Semgrep sebagai artefak
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: semgrep-report
           path: reports/semgrep.sarif
@@ -387,7 +387,7 @@ jobs:
     continue-on-error: true
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Siapkan PHP 8.4
         uses: shivammathur/setup-php@v2
@@ -401,7 +401,7 @@ jobs:
       # Kunci mengikuti hash composer.lock, jadi cache otomatis dibuang begitu
       # dependensi berubah.
       - name: Cache dependensi Composer
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.APP_BACKEND }}/vendor
           key: composer-${{ runner.os }}-${{ hashFiles('app/backend/composer.lock') }}
@@ -429,7 +429,7 @@ jobs:
 
       - name: Simpan laporan tes sebagai artefak
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: phpunit-report
           path: ${{ env.APP_BACKEND }}/coverage/
