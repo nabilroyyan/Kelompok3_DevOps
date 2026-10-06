@@ -22,7 +22,7 @@ concurrency:
 env:
   POLICY_DIR: docs/SEC-ENG/policy
   APP_DIR: docs/Dev/axon-devsecops-dss/app
-  COMPOSE_FILE: docs/Infra/docker-compose.yml
+  COMPOSE_FILE: docs/INFRA/docker-compose.yml
 
 jobs:
   # ---- Gate 1: Secret Scanning — Zero Tolerance ----
@@ -109,10 +109,29 @@ jobs:
           done
           exit $rc
 
+  # ---- Gate 5: SAST (Semgrep) — SQL Injection dan pola kode berbahaya ----
+  # NON-BLOCKING pada run pertama (continue-on-error). Lihat hasilnya dulu; bila
+  # sudah bersih atau temuan palsu sudah ditangani, hapus baris continue-on-error
+  # agar menjadi gate yang memblokir. Hanya temuan berseverity ERROR yang dihitung.
+  sast-semgrep:
+    name: Gate 5 - SAST (Semgrep)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - name: Semgrep scan
+        run: >
+          semgrep scan --metrics=off --error --severity ERROR
+          --config p/php --config p/javascript --config p/owasp-top-ten
+          --exclude vendor --exclude node_modules
+          "$APP_DIR"
+
   # ---- Ringkasan: satu status wajib untuk branch protection ----
   security-gate-passed:
     name: Security Gate - PASSED
     runs-on: ubuntu-latest
-    needs: [secret-scan, sca-dependencies, container-policy, image-scan]
+    needs: [secret-scan, sca-dependencies, container-policy, image-scan, sast-semgrep]
     steps:
       - run: echo "Seluruh Security Gate lulus."
