@@ -1,46 +1,48 @@
-# Gitleaks - Baseline Secret Scanning Policy (Issue #5, Milestone 1)
-# Ancaman TM v1: T-06 (kredensial DB bocor/hardcode), aset A-01 & A-06.
-# Kebijakan: temuan secret apa pun = PIPELINE FAIL (Zero Tolerance Kredensial Bocor).
+# Gitleaks — Secret Scanning (Issue #5, Milestone 3)
+# PO 1.2 Risk.md: Kredensial & Secrets bocor = ZERO TOLERANCE (0). Temuan apa pun = build GAGAL, commit ditolak.
+# Ancaman TM v1: T-06 (kredensial/APP_KEY/private key bocor). Aset: A-01, A-06.
+#
+# Pemakaian (dari root repo):
+#   gitleaks detect --source . --config docs/SEC-ENG/policy/gitleaks.toml --redact --verbose
+# Pre-commit: lihat policy/pre-commit-config.yaml. CI: policy/pipeline/security-gate.yml.
+# Alternatif/pemindai kedua (opsional): trufflehog git file://. --only-verified --fail
 
 title = "Axon DSS - Gitleaks Baseline Policy"
 
 [extend]
-# Pakai seluruh rule bawaan Gitleaks, lalu tambah rule khusus proyek di bawah.
+# Seluruh rule bawaan Gitleaks (AWS, GitHub, private key PEM, dst.) ditambah rule proyek di bawah.
 useDefault = true
 
-# --- Rule khusus proyek (PostgreSQL / classicmodels / Docker) ---
+# --- Rule khusus proyek (MySQL, Laravel) ---
 
 [[rules]]
-id = "axon-postgres-connection-string"
-description = "Connection string PostgreSQL dengan password tertanam (A-01)"
-regex = '''postgres(?:ql)?:\/\/[^\s:@\/]+:[^\s@\/]{3,}@[^\s\/]+'''
-keywords = ["postgres://", "postgresql://"]
+id = "axon-db-connection-string"
+description = "Connection string database dengan password tertanam (A-01)"
+regex = '''(?i)(?:mysql|mariadb|postgres(?:ql)?):\/\/[^\s:@\/]+:[^\s@\/$\{\}]{3,}@[^\s\/]+'''
+keywords = ["mysql://", "mariadb://", "postgres://", "postgresql://"]
 
 [[rules]]
 id = "axon-db-password-assignment"
-description = "Password database ter-hardcode pada file kode/konfigurasi (A-01)"
-regex = '''(?i)(?:db|database|postgres(?:ql)?|pg)[_-]?(?:pass(?:word)?|pwd)\s*[:=]\s*["']?([^\s"'$\{\}<>]{4,})["']?'''
+description = "Password database ter-hardcode pada berkas kode/konfigurasi (A-01)"
+# Hanya satu baris ([ \t]*), nilai harus diawali huruf/angka sehingga referensi ${VAR} atau ${VAR:?pesan} tidak terdeteksi.
+regex = '''(?i)(?:db|database|mysql|mariadb|root)[_-]?(?:pass(?:word)?|pwd)[ \t]*[:=][ \t]*["']?([A-Za-z0-9][^\s"'$\{\}<>]{3,})["']?'''
 keywords = ["password", "passwd", "pwd"]
   [rules.allowlist]
-  regexes = ['''(?i)(changeme|example|placeholder|your[_-]?password|<.*>)''']
+  description = "Placeholder yang memang ada di repo"
+  regexes = ['''(?i)(changeme|example|placeholder|your[_-]?password|ubah-password-ini|password_mysql_anda)''']
 
 [[rules]]
 id = "axon-laravel-app-key"
-description = "APP_KEY Laravel ter-commit (dipakai untuk enkripsi & signing, A-01/A-06)"
-regex = '''APP_KEY\s*=\s*["']?base64:[A-Za-z0-9+\/=]{40,}["']?'''
+description = "APP_KEY Laravel ter-commit (enkripsi dan signing)"
+regex = '''APP_KEY[ \t]*[:=][ \t]*["']?base64:[A-Za-z0-9+\/=]{40,}["']?'''
 keywords = ["app_key"]
 
-[[rules]]
-id = "axon-sonar-token"
-description = "Token SonarQube ter-hardcode"
-regex = '''(?i)sonar[_-]?token\s*[:=]\s*["']?(sq[apu]_[a-f0-9]{40})["']?'''
-keywords = ["sonar"]
-
-# --- Allowlist global (dijaga seminimal mungkin, setiap entri wajib punya alasan) ---
+# --- Allowlist global (setiap entri wajib punya alasan) ---
 [allowlist]
 description = "Global allowlist"
 paths = [
-  '''(^|/)\.env\.example$''',      # template env tanpa nilai asli
-  '''(^|/)policy/gitleaks\.toml$''', # file aturan ini sendiri
-  '''(^|/)docs/.*\.md$''',        # dokumentasi (tetap tidak boleh berisi secret asli)
+  '''(^|/)\.env\.example$''',            # template env tanpa nilai asli
+  '''(^|/)docs/SEC-ENG/policy/gitleaks\.toml$''', # berkas aturan ini sendiri
+  '''(^|/)composer\.lock$''',            # hash integritas paket, bukan secret
+  '''(^|/)package-lock\.json$''',        # hash integritas paket, bukan secret
 ]
