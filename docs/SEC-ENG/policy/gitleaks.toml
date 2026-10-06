@@ -13,7 +13,7 @@ title = "Axon DSS - Gitleaks Baseline Policy"
 # Seluruh rule bawaan Gitleaks (AWS, GitHub, private key PEM, dst.) ditambah rule proyek di bawah.
 useDefault = true
 
-# --- Rule khusus proyek (MySQL, Laravel, Sonar) ---
+# --- Rule khusus proyek (MySQL, Laravel) ---
 
 [[rules]]
 id = "axon-db-connection-string"
@@ -36,12 +36,6 @@ id = "axon-laravel-app-key"
 description = "APP_KEY Laravel ter-commit (enkripsi dan signing)"
 regex = '''APP_KEY[ \t]*[:=][ \t]*["']?base64:[A-Za-z0-9+\/=]{40,}["']?'''
 keywords = ["app_key"]
-
-[[rules]]
-id = "axon-sonar-token"
-description = "Token SonarQube ter-hardcode"
-regex = '''(?i)sonar[_-]?token[ \t]*[:=][ \t]*["']?(sq[apu]_[a-f0-9]{40})["']?'''
-keywords = ["sonar"]
 
 # --- Allowlist global (setiap entri wajib punya alasan) ---
 [allowlist]
