@@ -33,8 +33,8 @@ updates:
   # Base image pada image backend (php) dan reverse proxy (node, nginx)
   - package-ecosystem: docker
     directories:
-      - /docs/INFRA/docker/app
-      - /docs/INFRA/docker/proxy
+      - /docker/app
+      - /docker/proxy
     schedule:
       interval: weekly
       day: monday
@@ -47,13 +47,40 @@ updates:
 
   # Image pada orkestrasi Compose (mis. mysql:8.0)
   - package-ecosystem: docker-compose
-    directory: /docs/INFRA
+    directory: /
     schedule:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
     commit-message:
       prefix: 'chore(infra)'
+    labels:
+      - dependencies
+      - security
+
+  # Dependensi aplikasi (PHP & JS). Ditambahkan oleh Infra saat migrasi ke struktur
+  # root: berkas .github/dependabot.yml sebelumnya hanya memantau action dan image,
+  # sehingga dependensi backend/frontend tidak pernah dijaga (T-11).
+  - package-ecosystem: composer
+    directory: /app/backend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore(deps)'
+    labels:
+      - dependencies
+      - security
+
+  - package-ecosystem: npm
+    directory: /app/frontend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore(deps)'
     labels:
       - dependencies
       - security
