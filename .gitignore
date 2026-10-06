@@ -2,8 +2,8 @@
 # Kelompok 3 DevOps — .gitignore tingkat repositori
 #
 # MENGAPA BERKAS INI ADA DI ROOT
-#   Sebelumnya hanya ada .gitignore di dalam tiap aplikasi (Laravel bawaan) dan
-#   di docs/INFRA/. Akibatnya tidak ada satu pun lapisan yang mencegah:
+#   Sebelumnya hanya ada .gitignore di dalam tiap aplikasi (Laravel bawaan).
+#   Akibatnya tidak ada satu pun lapisan yang mencegah:
 #     - berkas rahasia (.env) di lokasi baru yang belum punya .gitignore sendiri,
 #     - sampah sistem operasi (.DS_Store) yang sempat ter-commit,
 #     - node_modules/vendor/cache bila dibuat di direktori yang tidak terduga.
@@ -138,7 +138,6 @@ coverage/
 tmp/
 temp/
 *.log
-!docs/**/*.log
 
 # Pengaman eksplisit: berkas .gitignore bawaan framework harus selalu ter-track,
 # karena berkas itulah yang mempertahankan direktori kosong di repositori.
@@ -146,8 +145,22 @@ temp/
 !**/bootstrap/cache/.gitignore
 
 # Bersihkan pengecualian di atas hanya untuk folder bukti yang memang di-commit
-!docs/SEC-ENG/reports/**
-!docs/INFRA/evidence/**
+!reports/**
+
+# -----------------------------------------------------------------------------
+# 6b. ARTEFAK INFRA
+# -----------------------------------------------------------------------------
+# Sertifikat dev: hanya public cert yang boleh dibagikan, private key TIDAK
+# (docs/PO 1.2 Risk.md + TLS-5: private key TLS dilarang masuk Git).
+certs/*
+!certs/.gitkeep
+
+# Bukti hasil deploy/verifikasi (dibuat saat stack benar-benar dijalankan)
+/evidence/
+
+# Panduan deployment spesifik lingkungan pemilik peran Infra (berisi IP, akun,
+# dan langkah operasional pribadi) — sengaja tidak di-commit.
+docker/docs/panduan-deploy-azure.md
 
 # -----------------------------------------------------------------------------
 # 7. LINGKUNGAN PYTHON (dipakai skrip policy/gate)
